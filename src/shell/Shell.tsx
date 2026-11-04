@@ -75,7 +75,7 @@ export function Settings() {
         </div>
         <label className="check">
           <input type="checkbox" checked={s.companion} onChange={e => setPrefs({ companion: e.target.checked })} />
-          Small companion: a bird on a branch that silently reacts to gestures and to the end of a focus session
+          Companion: a bird beside the dock that silently mirrors your activity (rests during focus, celebrates a finished session, reacts to gestures)
         </label>
         <label className="check">
           <input type="checkbox" checked={s.reducedMotion} onChange={e => setPrefs({ reducedMotion: e.target.checked })} />

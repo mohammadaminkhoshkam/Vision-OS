@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { loadList, saveJson } from '../lib/store';
 import { clipVideo } from '../board/store';
 import { app, controls, toast } from '../state/app';
+import { touch } from '../state/workspace';
 import { Icon } from '../ui/icons';
 import { useRadialItems, useVisionHandler } from '../vision/router';
 
@@ -140,6 +141,8 @@ export function Cinema() {
       if (!seekDrag.current) setTime(ct);
       setDur(p.getDuration() || 0);
       if (videoId && ct > 5) localStorage.setItem(`vos.yt.pos.${videoId}`, String(Math.floor(ct)));
+      // every few seconds of playback, keep the workspace's «continue» card in step
+      if (videoId && p.getPlayerState?.() === 1 && Math.floor(ct) % 5 === 0) touch({ kind: 'video', id: videoId, title: p.getVideoData?.().title || videoId, t: Math.floor(ct) });
     }, 400);
     return () => clearInterval(t);
   }, [ready, videoId]);
@@ -148,6 +151,7 @@ export function Cinema() {
     const p = player.current;
     if (!p || !videoId) return;
     const title = p.getVideoData?.().title || videoId;
+    touch({ kind: 'video', id: videoId, title, t: Math.floor(p.getCurrentTime?.() ?? 0) });
     setRecent(r => {
       const next = [{ id: videoId, title, at: Date.now() }, ...r.filter(x => x.id !== videoId)].slice(0, 12);
       saveJson('vos.yt.recent', next);

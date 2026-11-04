@@ -33,7 +33,7 @@ interface Prefs {
 export type Preset = 'photo' | 'morning' | 'rainy' | 'sunset' | 'night';
 
 const PREFS_KEY = 'vos.prefs';
-const prefs = loadJson<Prefs>(PREFS_KEY, { theme: 'day', workspace: 'research', reducedMotion: false, gardenProgress: true, wallpaper: null, preset: 'photo', companion: false, userName: '' });
+const prefs = loadJson<Prefs>(PREFS_KEY, { theme: 'day', workspace: 'research', reducedMotion: false, gardenProgress: true, wallpaper: null, preset: 'photo', companion: true, userName: '' });
 
 export const app = createStore({
   screen: 'home' as Screen,

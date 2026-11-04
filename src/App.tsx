@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { lock, lockNow } from './lock/lock';
-import { focus } from './focus/store';
+import { current, focus } from './focus/store';
 import { LockScreen } from './lock/LockScreen';
 import { refreshAppData } from './apps/data';
 import { Cinema } from './cinema/Cinema';
@@ -21,6 +21,7 @@ import { Board } from './board/Board';
 import { FocusOverlay, FocusStudio } from './focus/FocusUI';
 import { cancelPlacing, garden } from './garden/gardenState';
 import { app, go, setPrefs } from './state/app';
+import { daypart } from './state/workspace';
 import { Calibration } from './vision/Calibration';
 import { vision, visionStatus } from './vision/engine';
 import { setGlobalRadialItems } from './vision/router';
@@ -61,6 +62,32 @@ function Desktop() {
     document.documentElement.dataset.preset = preset;
     document.documentElement.dataset.motion = reduced ? 'reduced' : 'full';
   }, [theme, reduced, preset]);
+
+  // Reactive environment: the scene follows the time of day, quiets down while a focus session
+  // runs, and blooms briefly when one is completed. CSS reads these attributes (redesign.css).
+  focus.use(s => s.sessions);
+  const focusing = current()?.status === 'running';
+  const reward = focus.use(s => s.lastReward);
+  useEffect(() => {
+    const set = () => (document.documentElement.dataset.daypart = daypart(new Date().getHours()));
+    set();
+    const t = setInterval(set, 60000);
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    document.documentElement.dataset.activity = focusing ? 'focus' : screen === 'reader' || screen === 'board' || screen === 'cinema' ? 'work' : 'idle';
+  }, [focusing, screen]);
+  useEffect(() => {
+    if (!reward) return;
+    document.documentElement.dataset.bloom = '1';
+    const t = setTimeout(() => delete document.documentElement.dataset.bloom, 2600);
+    return () => clearTimeout(t);
+  }, [reward]);
+  // a screen grows out of the dock button that opened it; other navigation uses the default
+  useEffect(() => {
+    const t = setTimeout(() => document.documentElement.style.removeProperty('--enter-origin'), 450);
+    return () => clearTimeout(t);
+  }, [screen]);
 
   useEffect(() => {
     void refreshAppData();
@@ -121,6 +148,8 @@ function Desktop() {
       )}
       {preset === 'rainy' && <div className="rain" aria-hidden />}
       {photoScene && screen === 'home' && <div className="scene-vignette" aria-hidden />}
+      <div className="scene-tint" aria-hidden />
+      <div className="scene-bloom" aria-hidden />
       <main className="stage">
         {screen === 'home' && <Home />}
         {screen === 'reader' && <Reader />}

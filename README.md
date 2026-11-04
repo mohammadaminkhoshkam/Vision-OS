@@ -10,6 +10,7 @@ It is not a kernel or a standalone OS. It runs on top of Windows, and everything
 
 ## Features
 
+- **A living research workspace.** Home is built around the work in progress rather than the clock: a *current session* card shows the paper or video you were on (page, saved notes, board cards) with one-click *Resume*, *With board* (split view) and *Focus* actions, and it switches to the focus session or a schedule item that is about to start when those matter more. The dock marks the active tool and puts a small live dot on tools that hold state (open paper, video, running timer, board cards). The scene follows the time of day, quiets its lights while a focus session runs and blooms when one is completed; the paper you are reading is ringed and labelled in the garden. Every transition respects reduced motion.
 - **Hand-gesture control.** MediaPipe hand tracking turns your index knuckle into a cursor. A pinch clicks, a held pinch drags, a V sign scrolls, an open-palm swipe turns pages, a two-hand pinch zooms, and holding an open palm opens a radial menu. Every threshold can be tuned on the *Gestures and calibration* screen.
 - **PDF reader.** Text-anchored highlights in several colors, a pen, a precision magnifier, bookmarks, focus mode and a split view with the knowledge board. Papers from your Marginal library open at the page you stopped on.
 - **Knowledge board.** Clip selected text (`C`) or draw a box around a figure in the reader, or send a moment from a YouTube video. Every card links back to its page or second in the source. Cards can be connected, and the board has pan/zoom, undo/redo and JSON export.
@@ -20,7 +21,7 @@ It is not a kernel or a standalone OS. It runs on top of Windows, and everything
 - **Library, schedule and stats.** All papers and every highlight and note in one place, a daily schedule with on-time reminders, tasks, focus time, Rooznegar time and reading progress.
 - **Command bar and voice.** `Ctrl+K` searches papers, videos, board cards and screens, and also runs commands. Voice commands use the same offline parser.
 - **Face lock.** An optional lock that opens when it recognizes your face and you blink, with a backup PIN.
-- **Moods and appearance.** Night greenhouse (photo), morning, rainy, warm sunset and painted night scenes; an optional small companion bird; a reduced-motion mode; or your Windows wallpaper as the background.
+- **Moods and appearance.** Night greenhouse (photo), morning, rainy, warm sunset and painted night scenes; a companion bird that rests during focus and celebrates a finished session (can be turned off); a reduced-motion mode; or your Windows wallpaper as the background.
 
 | Reader | Library |
 |---|---|

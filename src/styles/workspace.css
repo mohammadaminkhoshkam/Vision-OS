@@ -1,0 +1,188 @@
+/* Living Research Workspace — one design language on top of the earlier layers.
+   Loaded last. Three rules hold everywhere:
+   1. Surfaces come in three levels (--surface-1 floating chrome, --surface-2 cards, --surface-3 wells),
+      all dark glass with the same gold hairline; nothing else invents its own panel colour.
+   2. Gold (--accent) marks what is active or primary, green (--life) marks progress and live state.
+   3. Motion always has a cause (navigation, state change, completion) and scales with --motion,
+      so Reduced Motion turns it off in one place. */
+
+:root {
+  --surface-1: rgba(8, 22, 16, 0.74);
+  --surface-2: linear-gradient(180deg, rgba(20, 42, 31, 0.86), rgba(9, 24, 18, 0.9));
+  --surface-3: rgba(5, 16, 12, 0.55);
+  --line: rgba(213, 166, 79, 0.24);
+  --line-strong: rgba(213, 166, 79, 0.55);
+  --accent: #f1cd84;
+  --accent-deep: #c9973f;
+  --accent-ink: #1f170a;
+  --life: #8bd56e;
+  --text-1: #f5f0e5;
+  --text-2: rgba(245, 240, 229, 0.72);
+  --text-3: rgba(245, 240, 229, 0.52);
+  --blur: blur(14px) saturate(1.1);
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-calm: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-1: calc(140ms * var(--motion));
+  --dur-2: calc(280ms * var(--motion));
+  --dur-3: calc(1800ms * var(--motion));
+
+  /* earlier layers read these; point them at the shared tokens */
+  --panel-bg: var(--surface-2);
+  --panel-border: var(--line-strong);
+  --panel-inner: var(--surface-3);
+}
+
+/* ───────────── shared chrome: one surface for every floating control */
+.weather-pill, .qn, .tb-search, .tb-icon, .tb-profile, .home .garden-tools .chip {
+  background: var(--surface-1);
+  border-color: var(--line-strong);
+  backdrop-filter: var(--blur);
+  transition: border-color var(--dur-1) ease, transform var(--dur-1) var(--ease-out), background var(--dur-1) ease;
+}
+.qn.on { background: linear-gradient(180deg, var(--accent), var(--accent-deep)); color: var(--accent-ink); }
+.panel-screen { background: rgba(6, 18, 13, 0.88); border-color: var(--line-strong); }
+.pl-card, .lib-card { border-color: var(--line); }
+
+/* ───────────── home: status strip → session hero → quick actions */
+.home-left { align-items: stretch; gap: 14px; padding-top: 0; }
+.status-strip {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap; color: var(--text-1);
+  font-size: 15px; text-shadow: 0 1px 10px rgba(0, 0, 0, 0.7);
+}
+.ss-greet { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.ss-greet svg { color: var(--accent); }
+.ss-time { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; }
+.ss-date { color: var(--text-2); }
+.status-strip .weather-pill { min-width: 0; gap: 12px; padding: 4px 12px; font-size: 14px; margin-inline-start: auto; }
+.status-strip .wp-icon svg { width: 20px; height: 20px; }
+
+.session-hero {
+  pointer-events: auto; position: relative; overflow: hidden; color: var(--text-1);
+  padding: 20px 20px 18px; border-radius: 20px;
+  background: var(--surface-2); border: 1px solid var(--line-strong);
+  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  box-shadow: var(--panel-shadow);
+  animation: hero-in var(--dur-2) var(--ease-out) backwards;
+}
+.session-hero::before {
+  /* a warm light behind the work, echoing the planter in the scene */
+  content: ''; position: absolute; inset: -40% -20% auto auto; width: 70%; height: 120%; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(241, 205, 132, 0.16), rgba(241, 205, 132, 0));
+}
+@keyframes hero-in { from { opacity: 0; transform: translateY(8px); } }
+.sh-eyebrow { display: flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: var(--accent); }
+.sh-live { width: 7px; height: 7px; border-radius: 99px; background: var(--life); box-shadow: 0 0 8px var(--life); }
+.session-hero.kind-start .sh-live { background: var(--text-3); box-shadow: none; }
+.session-hero h2 { margin: 6px 0 14px; font-size: clamp(24px, 2.2vw, 30px); line-height: 1.15; font-weight: 750; color: #fffaf0; }
+.sh-next {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; padding: 10px 12px; border-radius: 12px;
+  background: rgba(241, 205, 132, 0.1); border: 1px solid var(--line-strong); color: var(--text-1); font-weight: 600;
+}
+.sh-next svg { color: var(--accent); flex: none; }
+.sh-next small { margin-inline-start: auto; color: var(--text-2); font-weight: 500; }
+.sh-work { padding: 14px; border-radius: 14px; background: var(--surface-3); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; }
+.sh-work-head { display: flex; gap: 12px; align-items: flex-start; }
+.sh-kind { flex: none; width: 44px; height: 54px; border-radius: 6px; display: grid; place-items: center; background: linear-gradient(160deg, #eae2cc, #bdb197); color: #3b4a33; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4); }
+.sh-work-text { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.sh-title { font-size: 17px; font-weight: 700; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sh-meta { font-size: 13px; color: var(--text-2); line-height: 1.5; margin: 0; }
+.sh-progress { height: 5px; border-radius: 99px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.sh-progress > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #5fbf4a, var(--life)); box-shadow: 0 0 8px rgba(139, 213, 110, 0.5); transition: width var(--dur-3) var(--ease-calm); }
+.sh-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.sh-btn {
+  display: inline-flex; align-items: center; gap: 7px; height: 40px; padding: 0 14px; border-radius: 99px; cursor: pointer;
+  font: inherit; font-size: 14px; font-weight: 600; color: var(--text-1);
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line-strong);
+  transition: transform var(--dur-1) var(--ease-out), border-color var(--dur-1) ease, box-shadow var(--dur-1) ease;
+}
+.sh-btn:hover, .sh-btn[data-vhover] { border-color: var(--accent); transform: translateY(-1px); }
+.sh-btn:active { transform: translateY(0) scale(0.97); }
+.sh-btn.primary { background: linear-gradient(180deg, var(--accent), var(--accent-deep)); color: var(--accent-ink); border-color: transparent; box-shadow: 0 8px 20px -8px rgba(213, 166, 79, 0.7); }
+.sh-btn:focus-visible, .recent-row:focus-visible, .qn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.recent-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.recent-row {
+  width: 100%; display: flex; align-items: flex-start; gap: 10px; padding: 9px 11px; border-radius: 12px; cursor: pointer; text-align: start;
+  font: inherit; color: var(--text-1); background: var(--surface-3); border: 1px solid var(--line);
+  transition: border-color var(--dur-1) ease;
+}
+.recent-row:hover, .recent-row[data-vhover] { border-color: var(--line-strong); }
+.recent-row svg { flex: none; margin-top: 2px; color: var(--accent); }
+.rr-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.recent-row .paper-title { font-size: 14px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.recent-row .paper-meta { font-size: 12px; color: var(--text-3); }
+
+/* secondary context steps back while a focus session runs */
+.home-cards { transition: opacity var(--dur-3) var(--ease-calm); }
+:root[data-activity='focus'] .home-cards { opacity: 0.55; }
+:root[data-activity='focus'] .home-cards:hover { opacity: 1; }
+
+/* ───────────── compact dock with live-state dots */
+.arc-dock .pod-halo { width: 100px; height: 100px; left: -50px; top: -50px; }
+.arc-dock .pod.on:not(.center) { background: radial-gradient(circle at 35% 28%, #34583b, #10261a 75%); }
+.pod-live {
+  position: absolute; left: 0; top: calc(var(--r) - 2px); width: 7px; height: 7px; margin-left: -3.5px; border-radius: 99px; z-index: 2;
+  background: var(--life); box-shadow: 0 0 0 2px rgba(8, 20, 15, 0.9), 0 0 8px var(--life); pointer-events: none;
+}
+.pod-live.pulse-live { animation: live-pulse calc(2.4s * var(--motion) + 0.01s) ease-in-out infinite; }
+@keyframes live-pulse { 50% { box-shadow: 0 0 0 2px rgba(8, 20, 15, 0.9), 0 0 2px var(--life); opacity: 0.6; } }
+.arc-dock .pod-label { display: flex; flex-direction: column; align-items: center; gap: 1px; white-space: nowrap; }
+.arc-dock .pod-label small { font-size: 11px; font-weight: 500; opacity: 0.8; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+.arc-dock .pod-label.on small { display: none; }
+.screen-home .stage { bottom: 112px; }
+.companion { left: calc(50% + min(760px, 100vw - 340px) * 0.5 + 24px); bottom: 28px; }
+.companion.rest svg { animation: none; transform: translateY(3px); transition: transform var(--dur-3) var(--ease-calm); }
+
+/* ───────────── screen transitions: grow out of the control that opened them */
+.stage > * {
+  transform-origin: var(--enter-origin, 50% 100%);
+  animation: screen-in var(--dur-2) var(--ease-out) backwards;
+}
+@keyframes screen-in { from { opacity: 0; transform: scale(0.97); } }
+
+/* ───────────── reactive environment */
+.scene-tint, .scene-bloom { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+.scene-tint { opacity: 0; transition: opacity var(--dur-3) var(--ease-calm), background var(--dur-3) var(--ease-calm); mix-blend-mode: soft-light; }
+:root[data-daypart='dawn'] .scene-tint { opacity: 1; background: linear-gradient(180deg, rgba(255, 170, 140, 0.35), rgba(255, 210, 160, 0.12) 60%, transparent); }
+:root[data-daypart='day'] .scene-tint { opacity: 1; background: linear-gradient(180deg, rgba(255, 250, 230, 0.22), transparent 70%); }
+:root[data-daypart='dusk'] .scene-tint { opacity: 1; background: linear-gradient(180deg, rgba(255, 140, 70, 0.32), rgba(160, 70, 90, 0.18) 60%, transparent); }
+:root[data-daypart='night'] .scene-tint { opacity: 1; background: radial-gradient(ellipse at 50% 85%, transparent 30%, rgba(0, 10, 20, 0.35)); }
+/* focus: distracting light settles, the vignette closes in a little */
+:root[data-activity='focus'] .scene-tint { opacity: 1; mix-blend-mode: normal; background: radial-gradient(ellipse at 50% 60%, transparent 35%, rgba(2, 8, 6, 0.45)); }
+.motes, .rays, .lamp-breathe, .clouds { transition: opacity var(--dur-3) var(--ease-calm); }
+:root[data-activity='focus'] .motes, :root[data-activity='focus'] .rays, :root[data-activity='focus'] .clouds { opacity: 0.25; }
+:root[data-activity='focus'] .lamp-breathe { animation-duration: 14s; }
+:root[data-activity='focus'] .kgarden.photo .seed:not(.active) { opacity: 0.45; transition: opacity var(--dur-3) var(--ease-calm); }
+
+/* completion: a warm bloom rises from the planter for a moment */
+.scene-bloom { opacity: 0; background: radial-gradient(ellipse 55% 45% at 55% 78%, rgba(255, 214, 130, 0.45), rgba(255, 190, 90, 0.12) 55%, transparent 75%); mix-blend-mode: screen; }
+:root[data-bloom] .scene-bloom { animation: bloom-rise calc(2.6s * var(--motion)) var(--ease-calm); }
+@keyframes bloom-rise { 0% { opacity: 0; transform: translateY(20px); } 35% { opacity: 1; } 100% { opacity: 0; transform: translateY(-10px); } }
+:root[data-bloom] .kgarden .kflower { animation: flower-glow calc(2.6s * var(--motion)) var(--ease-calm); }
+@keyframes flower-glow { 40% { filter: drop-shadow(0 0 10px rgba(255, 214, 130, 0.9)); } }
+
+/* the paper in the current session */
+.seed-ring { animation: ring-breathe calc(3.6s * var(--motion) + 0.01s) ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center; }
+@keyframes ring-breathe { from { opacity: 0.45; transform: scale(0.94); } to { opacity: 1; transform: scale(1.04); } }
+.kgarden.photo .seed.active { animation: none; }
+.seed-tag { animation: hero-in var(--dur-2) var(--ease-out) backwards; }
+
+/* ───────────── reduced motion: keep every state change, drop the movement */
+:root[data-motion='reduced'] .stage > *, :root[data-motion='reduced'] .session-hero, :root[data-motion='reduced'] .seed-ring,
+:root[data-motion='reduced'] .seed-tag, :root[data-motion='reduced'] .pod-live, :root[data-motion='reduced'] .scene-bloom,
+:root[data-motion='reduced'] .kgarden .kflower { animation: none !important; }
+
+@media (max-width: 1280px) {
+  .status-strip { gap: 10px; font-size: 14px; }
+  .status-strip .weather-pill { margin-inline-start: 0; }
+  .session-hero { padding: 16px; }
+}
+@media (max-height: 820px) {
+  .session-hero h2 { margin-bottom: 10px; font-size: 24px; }
+  .sh-work { padding: 11px; gap: 9px; }
+}
+
+/* the focus timer lives in the empty left half of the top row, clear of Home's status strip */
+.focus-pill { top: calc(var(--titlebar-h) + 14px); left: 24px; right: auto; transform: none; }
+.is-focus .focus-pill { top: 14px; }
+.sh-next > svg + small { margin-inline-start: 0; }

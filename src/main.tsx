@@ -7,6 +7,7 @@ import './styles/app.css';
 import './styles/garden-ui.css';
 import './styles/features.css';
 import './styles/redesign.css';
+import './styles/workspace.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -1,18 +1,30 @@
-// Curved dock (reference design): nine round dark-green buttons with gold rims sitting on a
-// thin glowing gold arc; the centre (garden) button is larger with a halo ring. Every button
-// opens a real module. On reading/video/board screens the dock tucks away until the mouse or
-// the hand cursor comes near the bottom edge.
+// Curved dock: nine round buttons on a thin gold arc, the garden in the centre. Kept compact so
+// the scene and the work stay the subject. The active tool gets a lit rim and a label; tools that
+// hold live state in this run (an open paper, a paused video, a running focus timer, cards on the
+// board) show a small glowing dot, so the dock reads like a task bar of an OS rather than a menu.
+// On reading/video/board screens the dock tucks away until the mouse or hand cursor nears the edge.
 import { useEffect, useState } from 'react';
 import { appData } from '../apps/data';
 import { isTauri, platform, type AppId } from '../platform';
+import { board } from '../board/store';
+import { current, focus } from '../focus/store';
 import { app, go, toast, type PlannerTab, type Screen } from '../state/app';
+import { workspace } from '../state/workspace';
 import { Icon, type IconName } from '../ui/icons';
 import { useVisionHandler } from '../vision/router';
 
 type Item = { id: string; icon: IconName; label: string; screen?: Screen; tab?: PlannerTab; run?: () => void };
 
 const T = [0.06, 0.175, 0.29, 0.405, 0.5, 0.595, 0.71, 0.825, 0.94];
-const SAG = 36;
+const SAG = 30;
+
+/** Screen transitions grow out of the button that started them. */
+export function setEnterOrigin(el: Element) {
+  const r = el.getBoundingClientRect();
+  const stage = document.querySelector('.stage')?.getBoundingClientRect();
+  const x = r.left + r.width / 2 - (stage?.left ?? 0), y = r.top + r.height / 2 - (stage?.top ?? 0);
+  document.documentElement.style.setProperty('--enter-origin', `${Math.round(x)}px ${Math.round(y)}px`);
+}
 
 function useWidth() {
   const [w, setW] = useState(innerWidth);
@@ -72,17 +84,30 @@ export function BranchDock() {
   const compact = screen === 'reader' || screen === 'cinema' || screen === 'board';
   const open = !compact || peek || appsOpen;
 
-  const W = Math.min(900, vw - 300);
-  const H = 160;
-  const base = 96;
+  const W = Math.min(760, vw - 340);
+  const H = 136;
+  const base = 82;
   // quadratic arc through the button row; highest in the middle
   const P = (t: number) => ({ x: W * t, y: base - 4 * (1 - t) * t * SAG });
 
+  const docOpen = app.use(s => !!s.doc);
+  const live = workspace.use(s => s.live);
+  const cards = board.use(s => s.doc.nodes.length);
+  focus.use(s => s.sessions);
+  const timer = current();
+  /** what each tool is holding right now (tooltip detail + dot) */
+  const state: Record<string, string | undefined> = {
+    reader: docOpen ? live.reader ?? 'Document open' : undefined,
+    cinema: live.cinema,
+    board: cards ? `${cards} card${cards === 1 ? '' : 's'}` : undefined,
+    focus: timer ? (timer.status === 'paused' ? 'Paused' : 'Running') : undefined,
+  };
+
   const items: Item[] = [
-    { id: 'schedule', icon: 'calendar', label: 'Schedule', screen: 'planner', tab: 'schedule' },
+    { id: 'schedule', icon: 'calendar', label: 'Planner', screen: 'planner', tab: 'schedule' },
     { id: 'tasks', icon: 'tasks', label: 'Tasks', screen: 'planner', tab: 'tasks' },
-    { id: 'stats', icon: 'chart', label: 'Stats', screen: 'planner', tab: 'stats' },
     { id: 'focus', icon: 'timer', label: 'Focus', screen: 'focus' },
+    { id: 'reader', icon: 'book', label: 'Reader', screen: 'reader' },
     { id: 'home', icon: 'garden', label: 'Garden', screen: 'home' },
     { id: 'cinema', icon: 'monitor', label: 'Video', screen: 'cinema' },
     { id: 'board', icon: 'network', label: 'Knowledge board', screen: 'board' },
@@ -133,26 +158,33 @@ export function BranchDock() {
         const p = P(T[i]);
         const center = it.id === 'home';
         const active = isActive(it);
-        const size = center ? 96 : 62;
+        const size = center ? 78 : 52;
+        const detail = state[it.id];
         return (
           <div key={it.id} className="pod-slot" style={{ left: p.x, top: p.y, ['--r' as string]: `${size / 2}px` }}>
             {center && <span className="pod-halo" />}
             <button
-              className={`pod ${active ? 'on' : ''} ${center ? 'center' : ''}`}
+              className={`pod ${active ? 'on' : ''} ${center ? 'center' : ''} ${detail ? 'has-live' : ''}`}
               style={{ width: size, height: size }}
-              onClick={() => {
+              aria-current={active && it.id !== 'apps' ? 'page' : undefined}
+              onClick={e => {
                 if (it.run) return it.run();
+                setEnterOrigin(e.currentTarget);
                 if (it.tab) app.set({ plannerTab: it.tab });
                 go(it.screen!);
                 setAppsOpen(false);
               }}
               onMouseEnter={() => setHover(it.id)}
               onFocus={() => setHover(it.id)}
-              aria-label={it.label}
+              aria-label={detail ? `${it.label}: ${detail}` : it.label}
             >
-              <Icon name={it.icon} size={center ? 40 : 24} stroke={center ? 1.6 : 1.8} />
+              <Icon name={it.icon} size={center ? 34 : 21} stroke={center ? 1.6 : 1.8} />
             </button>
-            <span className={`pod-label ${active && it.id !== 'apps' ? 'on' : ''} ${hover === it.id ? 'show' : ''} ${center ? 'center' : ''}`}>{it.label}</span>
+            {detail && <span className={`pod-live ${it.id === 'focus' && timer?.status === 'running' ? 'pulse-live' : ''}`} aria-hidden />}
+            <span className={`pod-label ${active && it.id !== 'apps' ? 'on' : ''} ${hover === it.id ? 'show' : ''} ${center ? 'center' : ''}`}>
+              {it.label}
+              {detail && hover === it.id && <small dir="auto">{detail.length > 34 ? detail.slice(0, 33) + '…' : detail}</small>}
+            </span>
             {it.id === 'apps' && appsOpen && <AppsPopover onClose={() => setAppsOpen(false)} />}
           </div>
         );

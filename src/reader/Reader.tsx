@@ -5,6 +5,7 @@ import 'pdfjs-dist/web/pdf_viewer.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { platform } from '../platform';
 import { app, controls, toast } from '../state/app';
+import { touch } from '../state/workspace';
 import { Icon } from '../ui/icons';
 import { cursorPx, useRadialItems, useVisionHandler, type Px } from '../vision/router';
 import { loadNotes, mergeLineRects, saveNotes, uid, type DocNotes, type NRect } from './annotations';
@@ -238,6 +239,7 @@ export function Reader() {
         app.set({ pendingPage: null });
         const start = pending ?? (docRef.source === 'marginal' ? Math.max(saved.lastPage, docRef.paper.lastPage || 1) : saved.lastPage);
         setTimeout(() => goto(start, 'auto'), 60);
+        remember(start, doc.numPages);
       } catch (e) {
         setError(String(e));
       }
@@ -367,6 +369,19 @@ export function Reader() {
   }, [pdf]);
   useEffect(() => {
     if (pdf && page !== notes.lastPage) update(n => ({ ...n, lastPage: page }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
+  // the workspace remembers where you are, so Home can offer «continue where you left off»
+  const remember = (n: number, total: number) => {
+    if (!docRef) return;
+    touch(
+      docRef.source === 'marginal'
+        ? { kind: 'paper', id: docRef.paper.id, title: docRef.paper.title, page: n, pages: total }
+        : { kind: 'file', id: docId, title: docRef.name, page: n, pages: total },
+    );
+  };
+  useEffect(() => {
+    if (pdf) remember(page, pdf.numPages);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
