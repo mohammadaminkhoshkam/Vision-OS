@@ -490,3 +490,10 @@
 .ss-stats span { font-size: 11px; color: var(--text-2); text-align: center; }
 .ss-stats li.zero b { color: var(--text-3); }
 .session-summary .sh-btn { width: 100%; justify-content: center; }
+
+/* ───────────── usability study panel */
+.study .rec { margin-inline-start: auto; background: rgba(229, 72, 77, 0.16); color: #ff8a8d; }
+.study-tasks { margin: 8px 0 12px; padding-inline-start: 20px; display: flex; flex-direction: column; gap: 8px; }
+.study-tasks li { display: flex; flex-direction: column; gap: 2px; }
+.study-tasks li.done b { color: var(--life); }
+.study-res { font-size: 12px; color: var(--accent); font-variant-numeric: tabular-nums; }

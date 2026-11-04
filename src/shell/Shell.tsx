@@ -1,3 +1,4 @@
+import { StudyPanel } from '../study/StudyPanel';
 import { appData, refreshAppData } from '../apps/data';
 import { FaceLockSettings } from '../lock/FaceLockSettings';
 import { AiSettings } from '../ai/AiPanel';
@@ -153,6 +154,7 @@ export function Settings() {
           Turn the camera off
         </button>
       </section>
+      <StudyPanel />
     </div>
   );
 }

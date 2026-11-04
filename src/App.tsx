@@ -18,6 +18,7 @@ import { Workspace } from './shell/Workspace';
 import { CarryLayer } from './board/carry';
 import { watchNewPapers } from './discovery/store';
 import { watchSessions } from './focus/summary';
+import { watchStudy } from './study/recorder';
 import { SessionSummaryCard } from './focus/SessionSummary';
 import { AiPanel } from './ai/AiPanel';
 import { Companion } from './shell/Companion';
@@ -127,6 +128,7 @@ function Desktop() {
 
   useEffect(() => watchNewPapers(), []);
   useEffect(() => watchSessions(), []);
+  useEffect(() => watchStudy(), []);
 
   useEffect(() => {
     void refreshAppData();
