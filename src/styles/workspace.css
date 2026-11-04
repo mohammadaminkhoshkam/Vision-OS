@@ -384,3 +384,62 @@
 .paper-actions .related { margin-top: 8px; }
 .paper-actions .related h4 { color: var(--accent); font-size: 13px; }
 :root[data-motion='reduced'] .thread-line { animation: none; }
+
+/* ───────────── live gesture feedback on the hand cursor */
+.hc-hold { position: absolute; left: -28px; top: -28px; pointer-events: none; transform: rotate(-90deg); opacity: 0; }
+.hc-hold circle { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 151; stroke-dashoffset: 151; }
+.hand-cursor.holding .hc-hold { opacity: 1; }
+.hand-cursor.holding .hc-hold circle { animation: hold-fill var(--hold, 380ms) linear forwards; }
+.hand-cursor.drag .hc-hold { opacity: 1; }
+.hand-cursor.drag .hc-hold circle { stroke: var(--life); stroke-dashoffset: 0; }
+@keyframes hold-fill { to { stroke-dashoffset: 0; } }
+.hc-chip {
+  position: absolute; left: 24px; top: 18px; white-space: nowrap; padding: 3px 10px; border-radius: 99px; font-size: 12.5px; font-weight: 700;
+  background: rgba(8, 20, 15, 0.92); color: var(--accent); border: 1px solid var(--line-strong); animation: chip-in 0.9s ease-out forwards;
+}
+@keyframes chip-in { 0% { opacity: 0; transform: translateY(4px); } 15% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; } }
+
+/* ───────────── gesture tutorial */
+.tutorial { position: fixed; inset: 0; z-index: 9000; background: rgba(3, 10, 7, 0.82); backdrop-filter: blur(6px); display: grid; grid-template-rows: auto 1fr; gap: 18px; padding: 70px 40px 40px; color: var(--text-1); }
+.tut-panel { justify-self: center; width: min(720px, 100%); padding: 20px 24px; border-radius: 20px; background: var(--surface-2); border: 1px solid var(--line-strong); box-shadow: var(--panel-shadow); }
+.tut-count { display: flex; align-items: center; gap: 12px; font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--accent); }
+.tut-dots { display: flex; gap: 5px; }
+.tut-dots span { width: 18px; height: 4px; border-radius: 99px; background: rgba(255, 255, 255, 0.15); }
+.tut-dots span.done { background: var(--life); }
+.tut-dots span.now { background: var(--accent); }
+.tut-step { display: flex; gap: 16px; align-items: flex-start; margin-top: 12px; }
+.tut-step h2, .tut-panel h2 { margin: 0 0 4px; font-size: 24px; }
+.tut-how { margin: 0 0 4px; font-size: 16px; }
+.tut-ring { flex: none; margin-top: 4px; }
+.tut-ring .ring-bg { fill: none; stroke: rgba(255, 255, 255, 0.12); stroke-width: 4; }
+.tut-ring .ring-fg { fill: none; stroke: var(--life); stroke-width: 4; stroke-linecap: round; transition: stroke-dasharray var(--dur-1) linear; }
+.tut-hint { margin: 10px 0 0; padding: 8px 12px; border-radius: 10px; background: rgba(241, 205, 132, 0.12); border: 1px solid var(--line-strong); font-size: 14px; }
+.tut-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.tut-scene { position: relative; display: grid; grid-template-columns: 1fr 1.2fr 1fr; grid-template-rows: 1fr 1fr; gap: 18px; min-height: 0; }
+.tut-scene > * { border-radius: 16px; border: 1px solid var(--line); background: rgb(9, 24, 18); padding: 16px; transition: box-shadow var(--dur-2) ease, opacity var(--dur-2) ease; opacity: 0.6; }
+.tut-scene > .tut-focus { opacity: 1; box-shadow: 0 0 0 2px var(--accent), 0 0 40px rgba(241, 205, 132, 0.25); }
+.tut-paper { display: flex; flex-direction: column; gap: 8px; justify-content: center; align-items: flex-start; }
+.tut-paper svg { color: var(--accent); }
+.tut-paper small, .tut-quote small { color: var(--text-3); }
+.tut-quote { align-self: center; background: #f6f2e8; color: #1f2420; font-size: 15px; line-height: 1.5; z-index: 2; width: 240px; }
+.tut-quote.lifted { opacity: 1; transform: rotate(-2deg); box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.8); pointer-events: none; }
+.tut-board { grid-row: span 2; display: flex; flex-direction: column; gap: 8px; align-items: center; justify-content: center; border-style: dashed; color: var(--accent); }
+.tut-board.filled { border-color: var(--life); color: var(--life); }
+.tut-text { overflow: auto; font-size: 14px; color: var(--text-2); }
+.tut-pages, .tut-menu { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 16px; }
+.tut-scene .tut-menu { grid-column: 1 / 3; }
+
+/* ───────────── getting started */
+.getting-started .gs-bar { height: 4px; border-radius: 99px; background: rgba(255, 255, 255, 0.1); overflow: hidden; margin-bottom: 8px; }
+.getting-started .gs-bar span { display: block; height: 100%; background: linear-gradient(90deg, #5fbf4a, var(--life)); transition: width var(--dur-3) var(--ease-calm); }
+.gs-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.gs-list button { width: 100%; display: flex; gap: 10px; align-items: flex-start; padding: 7px 8px; border: 0; border-radius: 10px; background: none; color: var(--text-1); text-align: start; cursor: pointer; font: inherit; }
+.gs-list button:hover:not(:disabled), .gs-list button[data-vhover] { background: rgba(255, 255, 255, 0.05); }
+.gs-list button:disabled { cursor: default; }
+.gs-check { flex: none; width: 18px; height: 18px; margin-top: 1px; border-radius: 5px; border: 1.5px solid rgba(245, 240, 229, 0.5); display: grid; place-items: center; color: #0d2410; }
+.gs-list li.done .gs-check { background: linear-gradient(160deg, #9be27a, #5fbf4a); border-color: transparent; }
+.gs-list li.done b { color: var(--text-3); text-decoration: line-through; font-weight: 500; }
+.gs-text { display: flex; flex-direction: column; gap: 1px; }
+.gs-text b { font-size: 14px; font-weight: 600; }
+.gs-text small { font-size: 12px; color: var(--text-3); }
+:root[data-motion='reduced'] .hc-chip, :root[data-motion='reduced'] .hc-hold circle { animation-duration: 0.01ms !important; }

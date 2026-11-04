@@ -15,6 +15,7 @@ import { platform } from '../platform';
 import { loadNotes } from '../reader/annotations';
 import { app, go, openPaper, toast } from '../state/app';
 import { resumeActivity } from '../state/resume';
+import { GettingStarted } from '../onboarding/GettingStarted';
 import { describeActivity, nextAction, relativeTime, workspace, type Activity } from '../state/workspace';
 import { Icon, type IconName } from '../ui/icons';
 import { useVisionHandler } from '../vision/router';
@@ -408,6 +409,7 @@ export function Home() {
         <GardenStudio />
       </div>
       <div className="home-cards">
+        <GettingStarted />
         <RecentCard />
         <TimeCard />
         <HabitsCard />

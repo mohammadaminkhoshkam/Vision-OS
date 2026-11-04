@@ -28,6 +28,7 @@ import { Calibration } from './vision/Calibration';
 import { vision, visionStatus } from './vision/engine';
 import { setGlobalRadialItems } from './vision/router';
 import { HandCursor, RadialMenu, VisionHUD } from './vision/VisionUI';
+import { GestureTutorial } from './vision/GestureTutorial';
 import { runText } from './voice/run';
 import { listen, voiceState } from './voice/voice';
 
@@ -172,6 +173,7 @@ function Desktop() {
       <AiPanel />
       <Launcher />
       <Toasts />
+      <GestureTutorial />
       <CarryLayer />
       <HandCursor />
     </div>
