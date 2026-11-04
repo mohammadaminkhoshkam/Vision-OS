@@ -16,6 +16,7 @@ import { Settings, Toasts } from './shell/Shell';
 import { Launcher } from './shell/Launcher';
 import { Workspace } from './shell/Workspace';
 import { CarryLayer } from './board/carry';
+import { watchNewPapers } from './discovery/store';
 import { AiPanel } from './ai/AiPanel';
 import { Companion } from './shell/Companion';
 import { FocusOverlay, FocusStudio } from './focus/FocusUI';
@@ -88,6 +89,8 @@ function Desktop() {
     const t = setTimeout(() => document.documentElement.style.removeProperty('--enter-origin'), 450);
     return () => clearTimeout(t);
   }, [screen]);
+
+  useEffect(() => watchNewPapers(), []);
 
   useEffect(() => {
     void refreshAppData();

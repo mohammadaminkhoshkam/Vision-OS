@@ -4,11 +4,12 @@ import * as pdfjs from 'pdfjs-dist';
 import 'pdfjs-dist/web/pdf_viewer.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { platform } from '../platform';
-import { app, controls, toast } from '../state/app';
+import { app, controls, openPaper, toast } from '../state/app';
 import { touch } from '../state/workspace';
 import { storeFileDoc } from '../state/fileStore';
 import { carryProps } from '../board/carry';
 import { CLIP_MIME } from '../board/model';
+import { RelatedList } from '../garden/GardenStudio';
 import { layout, setSide } from '../state/layout';
 import { usePane } from '../state/pane';
 import { Icon } from '../ui/icons';
@@ -643,6 +644,7 @@ export function Reader() {
                 <Icon name="bookmark" size={16} /> Page {faNum.format(b)}
               </button>
             ))}
+            {docRef.source === 'marginal' && <RelatedList id={docRef.paper.id} onPick={p => openPaper(p)} />}
             <h4>Highlights</h4>
             {notes.highlights.length === 0 && <p className="muted small">Select text and press H, or drag over text with a pinch</p>}
             {notes.highlights

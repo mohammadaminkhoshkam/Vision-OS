@@ -52,6 +52,8 @@ export const garden = createStore({
   placing: null as null | { kind: DecorKind; color?: string },
   ghost: null as null | { x: number; y: number; ok: boolean },
   inspect: null as string | null,
+  /** a connection thread chosen in the garden (two related papers) */
+  thread: null as null | { a: string; b: string; terms: string[] },
   picked: null as MarginalPaper | null,
   hover: null as { paper: MarginalPaper; rect: DOMRect } | null,
   canUndo: false,

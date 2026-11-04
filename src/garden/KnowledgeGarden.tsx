@@ -5,6 +5,7 @@ import type { MarginalPaper } from '../platform';
 import { Decor, type DecorKind } from './plants';
 import type { DecorItem } from './gardenState';
 import { fromPhoto } from './GardenScene';
+import type { Relation } from '../discovery/related';
 
 const PALETTE = ['#b8423a', '#efe6d2', '#d9a441', '#8a2a3a', '#c86a3a', '#e8d6a8'];
 
@@ -88,6 +89,8 @@ export function KnowledgeGarden({
   onLibrary,
   photo,
   active,
+  relations,
+  onThread,
 }: {
   papers: MarginalPaper[];
   showProgress: boolean;
@@ -98,8 +101,11 @@ export function KnowledgeGarden({
   photo?: boolean;
   /** the paper in the current session: lit up and labelled so the garden mirrors the work */
   active?: { id: string; page?: number } | null;
+  /** research connections between papers, drawn as threads of light */
+  relations?: Relation[];
+  onThread?: (r: Relation) => void;
 }) {
-  const props = { papers, showProgress, onOpen, onHover, onLibrary, activeId: active?.id, activePage: active?.page };
+  const props = { papers, showProgress, onOpen, onHover, onLibrary, activeId: active?.id, activePage: active?.page, relations, onThread };
   return photo ? <PhotoGarden {...props} /> : <PaintedGarden {...props} />;
 }
 
@@ -112,12 +118,38 @@ type GardenProps = {
   activeId?: string | null;
   /** page from the live session, fresher than Marginal's record */
   activePage?: number;
+  relations?: Relation[];
+  onThread?: (r: Relation) => void;
 };
+
+/** Threads of light between related papers (Reor-style discovery made visible). A thread through
+ *  the paper you are working on glows brighter; choosing one shows both papers and why. */
+function Threads({ pos, relations, activeId, onThread }: { pos: Map<string, { x: number; y: number }>; relations?: Relation[]; activeId?: string | null; onThread?: (r: Relation) => void }) {
+  if (!relations?.length) return null;
+  return (
+    <g className="threads">
+      {relations.map(r => {
+        const a = pos.get(r.a), b = pos.get(r.b);
+        if (!a || !b) return null;
+        const mx = (a.x + b.x) / 2, my = Math.min(a.y, b.y) - 40 - Math.abs(a.x - b.x) * 0.12;
+        const hot = r.a === activeId || r.b === activeId;
+        const d = `M${a.x},${a.y} Q${mx},${my} ${b.x},${b.y}`;
+        return (
+          <g key={`${r.a}-${r.b}`} className={`thread ${hot ? 'hot' : ''}`} role="button" data-vt aria-label={`Connection: ${r.terms.join(', ')}`} onClick={() => onThread?.(r)}>
+            <path d={d} className="thread-glow" style={{ strokeWidth: 2 + r.score * 6 }} />
+            <path d={d} className="thread-line" />
+            <path d={d} className="thread-hit" />
+          </g>
+        );
+      })}
+    </g>
+  );
+}
 
 /** Over the photo: each paper is a glowing seed light floating above the planter's plants,
  *  brighter as it is read; a finished paper opens into a small bloom. The paper in the current
  *  session is ringed and labelled with its page, so the scene reflects what you are working on. */
-function PhotoGarden({ papers, showProgress, onOpen, onHover, onLibrary, activeId, activePage }: GardenProps) {
+function PhotoGarden({ papers, showProgress, onOpen, onHover, onLibrary, activeId, activePage, relations, onThread }: GardenProps) {
   // the active paper always gets a place, the middle one, where its label stays clear of the panels
   const active = activeId ? papers.find(p => p.id === activeId) : undefined;
   const rest = papers.filter(p => p !== active).slice(0, active ? 11 : 12);
@@ -139,6 +171,7 @@ function PhotoGarden({ papers, showProgress, onOpen, onHover, onLibrary, activeI
           <feDropShadow dx="0" dy="6" stdDeviation="6" floodColor="#000" floodOpacity="0.55" />
         </filter>
       </defs>
+      <Threads pos={new Map(list.map((p, i) => [p.id, { x: a + ((b - a) * (i + 0.5)) / list.length, y: fromPhoto(0, 520 - ((i * 53) % 70)).y }]))} relations={relations} activeId={activeId} onThread={onThread} />
       {list.map((p, i) => {
         const prog = showProgress ? paperProgress(p) : 1;
         const x = a + ((b - a) * (i + 0.5)) / list.length;
@@ -190,7 +223,7 @@ function PhotoGarden({ papers, showProgress, onOpen, onHover, onLibrary, activeI
   );
 }
 
-function PaintedGarden({ papers, showProgress, onOpen, onHover, onLibrary, activeId }: GardenProps) {
+function PaintedGarden({ papers, showProgress, onOpen, onHover, onLibrary, activeId, relations, onThread }: GardenProps) {
   const beds = useMemo(() => {
     const groups = new Map<string, MarginalPaper[]>();
     for (const p of papers) {
@@ -235,6 +268,7 @@ function PaintedGarden({ papers, showProgress, onOpen, onHover, onLibrary, activ
       <ellipse cx={(x0 + x1) / 2} cy={bottom + 18} rx={(x1 - x0) / 2 + 120} ry={46} fill="url(#planterGlow)" />
       <ellipse cx={(x0 + x1) / 2} cy={top - 40} rx={(x1 - x0) / 2} ry={90} fill="url(#planterGlow)" opacity={0.55} style={{ mixBlendMode: 'screen' }} />
       <PlanterLeaves />
+      <Threads pos={new Map(slots.map(({ p, x }, i) => [p.id, { x, y: top - (70 + ((i * 37) % 44)) }]))} relations={relations} activeId={activeId} onThread={onThread} />
       {slots.map(({ p, bi, x }, i) => {
         const h = 70 + ((i * 37) % 44);
         const prog = showProgress ? paperProgress(p) : 1;

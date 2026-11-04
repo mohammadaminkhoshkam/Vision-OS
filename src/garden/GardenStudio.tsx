@@ -6,7 +6,12 @@ import { appData } from '../apps/data';
 import { focusOnPaper } from '../focus/FocusUI';
 import { balance } from '../focus/engine';
 import { focus } from '../focus/store';
-import { openPaper, toast } from '../state/app';
+import { go, openPaper, toast } from '../state/app';
+import type { MarginalPaper } from '../platform';
+import { board, commit } from '../board/store';
+import { paperMap } from '../board/model';
+import { relatedTo } from '../discovery/related';
+import { currentRelations, deepMatch, discovery, useRelations } from '../discovery/store';
 import { Icon } from '../ui/icons';
 import { beginPlacing, cancelPlacing, garden, isThirsty, isUnlocked, redoGarden, removeDecor, setCareSim, undoGarden, unlock, water } from './gardenState';
 import { paperProgress } from './KnowledgeGarden';
@@ -231,6 +236,7 @@ export function PaperActions() {
       <p className="muted small">
         Progress {fa.format(Math.round(prog * 100))}% · p. {fa.format(paper.lastPage || 1)} of {fa.format(paper.pages || 0)} · {fa.format(paper.notes)} notes in Marginal
       </p>
+      <RelatedList id={paper.id} onPick={p => garden.set({ picked: p })} />
       <div className="inspect-actions">
         <button
           className="btn primary"
@@ -262,6 +268,79 @@ export function PaperActions() {
           <Icon name="split" size={18} /> With the knowledge board
         </button>
       </div>
+    </div>
+  );
+}
+
+/** A connection thread chosen in the garden: both papers, the evidence, and where to go next. */
+export function ThreadCard() {
+  const t = garden.use(s => s.thread);
+  const papers = appData.use(s => s.papers);
+  if (!t) return null;
+  const a = papers.find(p => p.id === t.a), b = papers.find(p => p.id === t.b);
+  if (!a || !b) return null;
+  const close = () => garden.set({ thread: null });
+  return (
+    <div className="inspect card paper-actions thread-card">
+      <header className="card-h">
+        <Icon name="network" />
+        <h3>A research connection</h3>
+        <button className="ibtn tiny" onClick={close} aria-label="Close">
+          <Icon name="close" size={16} />
+        </button>
+      </header>
+      <p className="muted small">Linked because both mention: {t.terms.map(x => `«${x}»`).join(', ') || 'similar wording'}. Found on this computer from titles, highlights and board clips.</p>
+      {[a, b].map(p => (
+        <button key={p.id} className="thread-paper" onClick={() => (close(), openPaper(p))}>
+          <Icon name="book" size={16} />
+          <span dir="auto">{p.title}</span>
+          <small>{fa.format(Math.round(paperProgress(p) * 100))}%</small>
+        </button>
+      ))}
+      <div className="inspect-actions">
+        <button
+          className="btn"
+          onClick={() => {
+            close();
+            const related = currentRelations().map(r => [r.a, r.b, r.terms.slice(0, 2).join(', ')] as [string, string, string]);
+            commit(paperMap(board.get().doc, papers.map(p => ({ id: p.id, title: p.title })), related));
+            go('board');
+          }}
+        >
+          <Icon name="board" size={18} /> Show on the paper map
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Papers related to one paper, with the evidence. */
+export function RelatedList({ id, onPick }: { id: string; onPick: (p: MarginalPaper) => void }) {
+  const rels = useRelations();
+  const papers = appData.use(s => s.papers);
+  const running = discovery.use(s => s.running);
+  const deep = discovery.use(s => s.model);
+  const list = relatedTo(rels, id)
+    .map(r => ({ ...r, paper: papers.find(p => p.id === r.id) }))
+    .filter(r => r.paper);
+  return (
+    <div className="related">
+      <h4>
+        Related papers
+        <button className="link small" onClick={() => void deepMatch()} disabled={running} title="Use a local embedding model in Ollama for deeper matching">
+          {running ? 'Matching…' : deep ? 'Deep match ✓' : 'Deep match'}
+        </button>
+      </h4>
+      {list.length === 0 && <p className="muted small">No clear connections yet; they appear as you highlight and clip.</p>}
+      {list.map(r => (
+        <button key={r.id} className="side-row related-row" onClick={() => onPick(r.paper!)} title={`Shared: ${r.terms.join(', ')}`}>
+          <Icon name="network" size={15} />
+          <span className="rel-text">
+            <span dir="auto">{r.paper!.title}</span>
+            <small>{r.terms.slice(0, 3).join(' · ')}</small>
+          </span>
+        </button>
+      ))}
     </div>
   );
 }

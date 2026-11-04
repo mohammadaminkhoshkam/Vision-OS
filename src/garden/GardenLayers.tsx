@@ -4,6 +4,7 @@ import { useRef } from 'react';
 import { appData } from '../apps/data';
 import { app, go } from '../state/app';
 import { workspace } from '../state/workspace';
+import { useRelations } from '../discovery/store';
 import { useVisionHandler } from '../vision/router';
 import { commitMove, garden, isThirsty, moveDecorLive, placeAtGhost, updateGhost } from './gardenState';
 import { DecorLayer, KnowledgeGarden } from './KnowledgeGarden';
@@ -23,6 +24,7 @@ export function GardenLayers() {
   const preset = app.use(s => s.preset);
   const last = workspace.use(s => s.recent[0]);
   const active = last?.kind === 'paper' ? { id: last.id, page: last.page } : null;
+  const relations = useRelations();
   const { decor, editing, selected, placing, ghost, careSim } = garden.use(s => s);
   // over the photograph the decorative layer would duplicate real objects; it returns in the studio
   const photo = preset === 'photo' && !editing;
@@ -128,6 +130,8 @@ export function GardenLayers() {
           onLibrary={() => go('library')}
           photo={photo}
           active={active}
+          relations={relations}
+          onThread={r => garden.set({ thread: { a: r.a, b: r.b, terms: r.terms }, picked: null, inspect: null })}
         />
       )}
     </>

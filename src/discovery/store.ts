@@ -61,3 +61,27 @@ export async function deepMatch() {
     discovery.set({ running: false });
   }
 }
+
+const KNOWN = 'vos.knownPapers';
+
+/** When a new paper appears in the library, suggest how it connects to earlier work (once). */
+export function watchNewPapers() {
+  let known = new Set(loadJson<{ ids: string[] }>(KNOWN, { ids: [] }).ids);
+  let first = known.size === 0;
+  return appData.subscribe(() => {
+    const { papers, loaded } = appData.get();
+    if (!loaded || !papers.length) return;
+    const fresh = papers.filter(p => !known.has(p.id));
+    if (!fresh.length) return;
+    known = new Set(papers.map(p => p.id));
+    saveJson(KNOWN, { ids: [...known] });
+    if (first) return void (first = false); // the first run only learns the library
+    const rels = currentRelations();
+    for (const p of fresh.slice(0, 3)) {
+      const best = rels.filter(r => r.a === p.id || r.b === p.id).sort((x, y) => y.score - x.score)[0];
+      if (!best) continue;
+      const other = papers.find(x => x.id === (best.a === p.id ? best.b : best.a));
+      if (other) toast(`New paper «${p.title.slice(0, 40)}» connects to «${other.title.slice(0, 40)}» (${best.terms.slice(0, 2).join(', ')})`, 'ok');
+    }
+  });
+}

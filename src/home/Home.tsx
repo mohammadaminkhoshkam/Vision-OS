@@ -8,7 +8,7 @@ import { describe, refreshWeather, weather } from '../apps/weather';
 import { board } from '../board/store';
 import { remainingSec, stats } from '../focus/engine';
 import { current, focus, start, todayKey, useNow } from '../focus/store';
-import { GardenStudio, InspectCard, PaperActions } from '../garden/GardenStudio';
+import { GardenStudio, InspectCard, PaperActions, ThreadCard } from '../garden/GardenStudio';
 import { garden } from '../garden/gardenState';
 import { paperProgress } from '../garden/KnowledgeGarden';
 import { platform } from '../platform';
@@ -415,6 +415,7 @@ export function Home() {
       <FlowerCard />
       <InspectCard />
       <PaperActions />
+      <ThreadCard />
     </div>
   );
 }
