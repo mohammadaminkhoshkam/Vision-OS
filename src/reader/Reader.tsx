@@ -10,6 +10,7 @@ import { storeFileDoc } from '../state/fileStore';
 import { carryProps } from '../board/carry';
 import { CLIP_MIME } from '../board/model';
 import { RelatedList } from '../garden/GardenStudio';
+import { applyProjectMood } from '../garden/Journey';
 import { layout, setSide } from '../state/layout';
 import { usePane } from '../state/pane';
 import { Icon } from '../ui/icons';
@@ -249,6 +250,8 @@ export function Reader() {
         const start = pending ?? (docRef.source === 'marginal' ? Math.max(saved.lastPage, docRef.paper.lastPage || 1) : saved.lastPage);
         setTimeout(() => goto(start, 'auto'), 60);
         remember(start, doc.numPages);
+        // a project can carry its own environment
+        if (docRef.source === 'marginal') applyProjectMood(docRef.paper.collection);
       } catch (e) {
         setError(String(e));
       }

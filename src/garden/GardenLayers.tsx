@@ -5,6 +5,7 @@ import { appData } from '../apps/data';
 import { app, go } from '../state/app';
 import { workspace } from '../state/workspace';
 import { useRelations } from '../discovery/store';
+import { GrowthFx } from './Journey';
 import { useVisionHandler } from '../vision/router';
 import { commitMove, garden, isThirsty, moveDecorLive, placeAtGhost, updateGhost } from './gardenState';
 import { DecorLayer, KnowledgeGarden } from './KnowledgeGarden';
@@ -121,6 +122,7 @@ export function GardenLayers() {
         onInspect={id => garden.set({ inspect: id, picked: null })}
       />
       )}
+      {!editing && <GrowthFx photo={photo} />}
       {!editing && (
         <KnowledgeGarden
           papers={papers}

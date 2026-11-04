@@ -16,6 +16,7 @@ import { loadNotes } from '../reader/annotations';
 import { app, go, openPaper, toast } from '../state/app';
 import { resumeActivity } from '../state/resume';
 import { GettingStarted } from '../onboarding/GettingStarted';
+import { JourneyCard } from '../garden/Journey';
 import { describeActivity, nextAction, relativeTime, workspace, type Activity } from '../state/workspace';
 import { Icon, type IconName } from '../ui/icons';
 import { useVisionHandler } from '../vision/router';
@@ -413,6 +414,7 @@ export function Home() {
         <RecentCard />
         <TimeCard />
         <HabitsCard />
+        <JourneyCard />
       </div>
       <FlowerCard />
       <InspectCard />

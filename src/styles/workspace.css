@@ -443,3 +443,35 @@
 .gs-text b { font-size: 14px; font-weight: 600; }
 .gs-text small { font-size: 12px; color: var(--text-3); }
 :root[data-motion='reduced'] .hc-chip, :root[data-motion='reduced'] .hc-hold circle { animation-duration: 0.01ms !important; }
+
+/* ───────────── research journey */
+.journey .card-src { margin-inline-start: auto; background: rgba(139, 213, 110, 0.14); color: var(--life); }
+.jr-bar { height: 6px; border-radius: 99px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.jr-bar span { display: block; height: 100%; background: linear-gradient(90deg, #5fbf4a, var(--life)); box-shadow: 0 0 8px rgba(139, 213, 110, 0.5); transition: width var(--dur-3) var(--ease-calm); }
+.jr-stats { margin: 8px 0; font-size: 12.5px; color: var(--text-2); }
+.jr-projects { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.jr-projects li { display: flex; gap: 6px; align-items: stretch; }
+.jr-project { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-3); color: var(--text-1); text-align: start; cursor: pointer; font: inherit; }
+.jr-project:hover, .jr-project[data-vhover] { border-color: var(--line-strong); }
+.jr-name { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.jr-project small { font-size: 11.5px; color: var(--text-3); }
+.jr-mood { width: 112px; flex: none; font: inherit; font-size: 11.5px; color: var(--text-1); background: var(--surface-3); border: 1px solid var(--line); border-radius: 10px; padding: 0 6px; }
+
+/* fireflies: more of them as the garden matures */
+.firefly { fill: #ffe9a8; filter: drop-shadow(0 0 4px rgba(255, 220, 120, 0.9)); animation: firefly 9s ease-in-out infinite; transform-box: fill-box; }
+@keyframes firefly { 0%, 100% { opacity: 0; transform: translate(0, 0); } 25% { opacity: 0.9; } 50% { opacity: 0.4; transform: translate(14px, -18px); } 75% { opacity: 0.85; transform: translate(-8px, -6px); } }
+.fireflies.stage-4 .firefly { fill: #fff3c8; }
+:root[data-activity='focus'] .fireflies { opacity: 0.3; transition: opacity var(--dur-3) var(--ease-calm); }
+
+/* ───────────── considerate scene (Lively): calm under work screens, paused when hidden */
+:root[data-scene='calm'] .scene *, :root[data-scene='calm'] .fireflies *, :root[data-scene='calm'] .threads * { animation-play-state: paused !important; }
+:root[data-scene='paused'] *, :root[data-scene='paused'] *::before, :root[data-scene='paused'] *::after { animation-play-state: paused !important; }
+/* real weather: rain on the glass, grey light under clouds and fog, a cold tint for snow */
+.weather-rain { display: none; }
+:root[data-weather='rain'] .weather-rain, :root[data-weather='storm'] .weather-rain { display: block; opacity: 0.45; }
+:root[data-weather='cloud'] .scene-tint, :root[data-weather='fog'] .scene-tint { box-shadow: inset 0 0 0 100vmax rgba(120, 130, 135, 0.12); }
+:root[data-weather='fog'] .scene-vignette { backdrop-filter: blur(1.5px); }
+:root[data-weather='snow'] .scene-tint { box-shadow: inset 0 0 0 100vmax rgba(190, 210, 230, 0.1); }
+:root[data-weather='storm'] .scene-bloom { animation: storm-flash calc(14s * var(--motion) + 0.01s) linear infinite; background: rgba(220, 230, 255, 0.5); mix-blend-mode: screen; }
+@keyframes storm-flash { 0%, 96%, 100% { opacity: 0; } 97% { opacity: 0.5; } 98% { opacity: 0; } 98.6% { opacity: 0.3; } }
+:root[data-motion='reduced'] .firefly { animation: none; opacity: 0.6; }

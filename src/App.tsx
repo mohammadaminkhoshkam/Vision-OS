@@ -24,6 +24,9 @@ import { cancelPlacing, garden } from './garden/gardenState';
 import { app, go, setPrefs } from './state/app';
 import { APPS } from './apps/registry';
 import { daypart } from './state/workspace';
+import { sceneMode, weatherMood } from './state/ambience';
+import { isPane } from './state/layout';
+import { weather } from './apps/weather';
 import { Calibration } from './vision/Calibration';
 import { vision, visionStatus } from './vision/engine';
 import { setGlobalRadialItems } from './vision/router';
@@ -85,6 +88,35 @@ function Desktop() {
     const t = setTimeout(() => delete document.documentElement.dataset.bloom, 2600);
     return () => clearTimeout(t);
   }, [reward]);
+  // Lively-style considerate scene: follow the real weather, pause motion when the garden is
+  // hidden, covered by a work screen or running on a low battery
+  const weatherCode = weather.use(s => s.weather?.code);
+  const [hidden, setHidden] = useState(document.hidden);
+  const [battery, setBattery] = useState<{ level: number; charging: boolean } | null>(null);
+  useEffect(() => {
+    const on = () => setHidden(document.hidden);
+    document.addEventListener('visibilitychange', on);
+    type Battery = EventTarget & { level: number; charging: boolean };
+    let bat: Battery | null = null;
+    const read = () => bat && setBattery({ level: bat.level, charging: bat.charging });
+    void (navigator as Navigator & { getBattery?: () => Promise<Battery> }).getBattery?.().then(b => {
+      bat = b;
+      read();
+      b.addEventListener('levelchange', read);
+      b.addEventListener('chargingchange', read);
+    });
+    return () => {
+      document.removeEventListener('visibilitychange', on);
+      bat?.removeEventListener('levelchange', read);
+      bat?.removeEventListener('chargingchange', read);
+    };
+  }, []);
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.weather = weatherMood(weatherCode);
+    root.dataset.scene = sceneMode({ hidden, covered: isPane(screen) && !focusing, battery, reducedMotion: reduced });
+  }, [weatherCode, hidden, battery, screen, focusing, reduced]);
+
   // a screen grows out of the dock button that opened it; other navigation uses the default
   useEffect(() => {
     const t = setTimeout(() => document.documentElement.style.removeProperty('--enter-origin'), 450);
@@ -150,7 +182,7 @@ function Desktop() {
           {screen === 'home' && <GardenLayers />}
         </GardenScene>
       )}
-      {preset === 'rainy' && <div className="rain" aria-hidden />}
+      {preset === 'rainy' ? <div className="rain" aria-hidden /> : <div className="rain weather-rain" aria-hidden />}
       {photoScene && screen === 'home' && <div className="scene-vignette" aria-hidden />}
       <div className="scene-tint" aria-hidden />
       <div className="scene-bloom" aria-hidden />
