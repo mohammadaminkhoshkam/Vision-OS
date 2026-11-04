@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { loadList, saveJson } from '../lib/store';
 import { clipVideo } from '../board/store';
+import { carryProps } from '../board/carry';
 import { app, controls, go, toast } from '../state/app';
 import { touch } from '../state/workspace';
 import { isPane, layout, setSide } from '../state/layout';
@@ -374,7 +375,7 @@ export function Cinema() {
         <ul className="marks">
           {marks.length === 0 && <li className="muted small">Use “Bookmark” from the radial menu, or say “bookmark”, to save the current moment.</li>}
           {marks.map(m => (
-            <li key={m.id}>
+            <li key={m.id} {...(videoId ? carryProps({ type: 'video', text: m.note, source: { kind: 'video', videoId, t: m.t, title: p()?.getVideoData?.().title || videoId } }) : {})}>
               <button className="mark-t" onClick={() => p()?.seekTo(m.t, true)} dir="ltr">
                 {fmt(m.t)}
               </button>

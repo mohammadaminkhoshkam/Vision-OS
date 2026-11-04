@@ -7,6 +7,8 @@ import { platform } from '../platform';
 import { app, controls, toast } from '../state/app';
 import { touch } from '../state/workspace';
 import { storeFileDoc } from '../state/fileStore';
+import { carryProps } from '../board/carry';
+import { CLIP_MIME } from '../board/model';
 import { layout, setSide } from '../state/layout';
 import { usePane } from '../state/pane';
 import { Icon } from '../ui/icons';
@@ -360,6 +362,25 @@ export function Reader() {
       return lh ? { ...n, highlights: n.highlights.slice(0, -1) } : n;
     });
 
+  // when the pane is resized (board opened beside it, splitter dragged) keep the page fitting:
+  // zoom follows the width change, so a page that filled the pane still fills it
+  useEffect(() => {
+    const sc = scroller.current;
+    if (!sc || !pdf || typeof ResizeObserver === 'undefined') return;
+    let last = sc.clientWidth;
+    const ro = new ResizeObserver(() => {
+      const w = sc.clientWidth;
+      if (!w || !last || Math.abs(w - last) < 24) return;
+      const k = w / last;
+      last = w;
+      const ratio = sc.scrollTop / Math.max(1, sc.scrollHeight);
+      setScale(v => Math.min(4, Math.max(0.4, v * k)));
+      requestAnimationFrame(() => requestAnimationFrame(() => (sc.scrollTop = ratio * sc.scrollHeight)));
+    });
+    ro.observe(sc);
+    return () => ro.disconnect();
+  }, [pdf]);
+
   // track the current page while scrolling and remember it
   useEffect(() => {
     const sc = scroller.current;
@@ -613,8 +634,8 @@ export function Reader() {
       </div>
 
       <div className="reader-body">
-        {!focus && !beside && (
-          <aside className="reader-side">
+        {!focus && (
+          <aside className={`reader-side ${beside ? 'beside' : ''}`}>
             <h4>Bookmarks</h4>
             {notes.bookmarks.length === 0 && <p className="muted small">No bookmarks yet</p>}
             {notes.bookmarks.map(b => (
@@ -628,7 +649,7 @@ export function Reader() {
               .slice()
               .reverse()
               .map(h => (
-                <button key={h.id} className="side-row hl-row" onClick={() => goto(h.page)}>
+                <button key={h.id} className="side-row hl-row" onClick={() => goto(h.page)} {...carryProps(h.text ? { type: 'text', text: h.text, source: source(h.page) } : null)}>
                   <span className="hl-chip" style={{ background: h.color }} />
                   <span dir="auto" className="hl-text">
                     {h.text || '—'}
@@ -638,7 +659,18 @@ export function Reader() {
               ))}
           </aside>
         )}
-        <div className="pdf-scroll" ref={scroller}>
+        <div
+          className="pdf-scroll"
+          ref={scroller}
+          onDragStart={e => {
+            // dragging selected text carries a sourced quote onto the board beside the paper
+            const sel = getSelection();
+            const text = sel?.toString().trim();
+            const pg = Number((sel?.anchorNode?.parentElement?.closest('.pdf-page') as HTMLElement | null)?.dataset.page);
+            if (!text || !pg) return;
+            e.dataTransfer.setData(CLIP_MIME, JSON.stringify({ type: 'text', text, source: source(pg) }));
+          }}
+        >
           {error && <div className="card">Could not open the PDF: {error}</div>}
           {!pdf && !error && <div className="loading-leaf">Opening…</div>}
           {pdf &&

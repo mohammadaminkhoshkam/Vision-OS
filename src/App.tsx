@@ -15,6 +15,7 @@ import { Planner } from './screens/Planner';
 import { Settings, Toasts } from './shell/Shell';
 import { Launcher } from './shell/Launcher';
 import { Workspace } from './shell/Workspace';
+import { CarryLayer } from './board/carry';
 import { AiPanel } from './ai/AiPanel';
 import { Companion } from './shell/Companion';
 import { FocusOverlay, FocusStudio } from './focus/FocusUI';
@@ -168,6 +169,7 @@ function Desktop() {
       <AiPanel />
       <Launcher />
       <Toasts />
+      <CarryLayer />
       <HandCursor />
     </div>
   );

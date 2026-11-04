@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { Icon } from '../ui/icons';
 import { isVisionModel, RECOMMENDED } from './ollama';
 import { ACTIONS, ROLES, toBlocks } from './prompts';
+import { carryProps } from '../board/carry';
 import { ai, answerToBoard, cancelAssistant, checkStatus, closeAssistant, pullModel, runAssistant, setAiSettings } from './store';
 
 const fa = new Intl.NumberFormat('en-US');
@@ -192,7 +193,11 @@ export function AiPanel() {
 
       <div className="ai-out">
         {s.running && !s.answer && <div className="ai-thinking">Thinking… (the first answer may take a few seconds)</div>}
-        {s.answer && <Answer text={s.answer} />}
+        {s.answer && (
+          <div className="ai-carry" {...(s.running ? {} : carryProps({ type: 'ai', text: `${s.answer.trim()}\n\n— ${s.usedModel} · local model answer; check before citing`, source: s.ctx?.source ?? null }))}>
+            <Answer text={s.answer} />
+          </div>
+        )}
         {s.error && <p className="ai-warn">Error: {s.error}</p>}
       </div>
 

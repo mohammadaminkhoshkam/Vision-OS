@@ -315,3 +315,44 @@
 @keyframes zzz { 0% { opacity: 0; transform: translate(0, 4px); } 40% { opacity: 1; } 100% { opacity: 0; transform: translate(6px, -8px); } }
 .companion.stretch .wing { transition: d 0.6s var(--ease-calm); }
 :root[data-motion='reduced'] .companion *, :root[data-motion='reduced'] .companion-hit { animation: none !important; transition: none !important; }
+
+/* ───────────── knowledge board: frames, paper map, labelled links, drops */
+.bcard-note { background: var(--note, #fbf4e2); }
+.swatch.tiny { width: 16px; height: 16px; margin: 0 1px; border-width: 1.5px; }
+.bframe {
+  position: absolute; border-radius: 18px; border: 1.5px dashed rgba(241, 205, 132, 0.45);
+  background: rgba(241, 205, 132, 0.05);
+}
+.bframe.sel { border-style: solid; border-color: var(--accent); }
+.bframe-h { position: absolute; left: 10px; right: 10px; top: -18px; display: flex; align-items: center; gap: 6px; cursor: grab; }
+.bframe-h input {
+  font: inherit; font-size: 14px; font-weight: 700; color: var(--accent); background: rgba(8, 20, 15, 0.92);
+  border: 1px solid var(--line-strong); border-radius: 99px; padding: 4px 12px; min-width: 120px; max-width: 70%;
+}
+.bframe-resize { position: absolute; right: -6px; bottom: -6px; width: 16px; height: 16px; border-radius: 4px; background: var(--accent); cursor: nwse-resize; opacity: 0.7; }
+.bcard-paper { background: linear-gradient(180deg, #24402f, #12271c); color: var(--text-1); border: 1.5px solid var(--accent-deep); }
+.bcard-paper .bcard-h { background: rgba(241, 205, 132, 0.16); color: var(--accent); }
+.paper-node-title { font-weight: 700; font-size: 14.5px; line-height: 1.4; margin: 10px 12px 8px; }
+.bcard-paper .bar { margin: 0 12px 12px; height: 5px; background: rgba(255, 255, 255, 0.12); border-radius: 99px; overflow: hidden; }
+.bcard-paper .bar > span { display: block; height: 100%; background: linear-gradient(90deg, #5fbf4a, var(--life)); }
+.board-edges .edge-label { font-size: 12px; fill: var(--accent); paint-order: stroke; stroke: rgba(8, 20, 15, 0.9); stroke-width: 4px; font-weight: 600; pointer-events: none; }
+.board-edges .edge.sel path { stroke: var(--accent); stroke-width: 3.5; }
+.board-edges { overflow: visible; }
+.edge-editor { display: flex; gap: 4px; align-items: center; padding: 4px; border-radius: 10px; background: rgba(8, 20, 15, 0.96); border: 1px solid var(--line-strong); }
+.edge-editor input { flex: 1; min-width: 0; font: inherit; font-size: 12.5px; padding: 4px 8px; border-radius: 7px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.06); color: var(--text-1); }
+.board-host.drop-over, :root[data-carrying] .board-host { box-shadow: inset 0 0 0 2px var(--accent), inset 0 0 60px rgba(241, 205, 132, 0.12); }
+[data-carry] { cursor: grab; }
+.carry-ghost {
+  position: fixed; z-index: 9998; pointer-events: none; transform: translate(14px, 14px) rotate(-2deg); max-width: 260px;
+  display: flex; gap: 8px; align-items: flex-start; padding: 8px 12px; border-radius: 12px; font-size: 13px; line-height: 1.4;
+  background: rgba(251, 244, 226, 0.97); color: #1f2420; box-shadow: 0 16px 30px -10px rgba(0, 0, 0, 0.7); border: 1.5px solid var(--accent-deep);
+  transition: transform var(--dur-1) var(--ease-out);
+}
+.carry-ghost.over { transform: translate(14px, 14px) rotate(0deg) scale(1.05); border-color: var(--life); }
+.carry-ghost span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ai-carry { cursor: grab; border-radius: 10px; }
+.ai-carry:hover { box-shadow: 0 0 0 1px var(--line-strong); }
+/* beside the board the highlights column narrows (it is where quotes are dragged from), and it
+   steps aside when the pane gets too narrow for the page */
+.reader-side.beside { width: 210px; }
+@container (max-width: 780px) { .reader-side { display: none; } }
