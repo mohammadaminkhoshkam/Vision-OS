@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { MotionConfig } from 'motion/react';
 import { lock, lockNow } from './lock/lock';
 import { current, focus } from './focus/store';
 import { LockScreen } from './lock/LockScreen';
@@ -19,6 +20,7 @@ import { Companion } from './shell/Companion';
 import { FocusOverlay, FocusStudio } from './focus/FocusUI';
 import { cancelPlacing, garden } from './garden/gardenState';
 import { app, go, setPrefs } from './state/app';
+import { APPS } from './apps/registry';
 import { daypart } from './state/workspace';
 import { Calibration } from './vision/Calibration';
 import { vision, visionStatus } from './vision/engine';
@@ -28,16 +30,15 @@ import { runText } from './voice/run';
 import { listen, voiceState } from './voice/voice';
 
 setGlobalRadialItems([
-  { id: 'home', label: 'Garden', icon: 'garden', run: () => go('home') },
-  { id: 'reader', label: 'Read', icon: 'book', run: () => go('reader') },
-  { id: 'cinema', label: 'YouTube', icon: 'youtube', run: () => go('cinema') },
-  { id: 'board', label: 'Knowledge board', icon: 'board', run: () => go('board') },
+  ...APPS.filter(a => a.radial).map(a => ({ id: a.id, label: a.label, icon: a.icon, run: () => go(a.screen) })),
   { id: 'timer', label: 'Timer', icon: 'timer', run: () => focus.set(s => ({ overlayHidden: !s.overlayHidden })) },
 ]);
 
 export function App() {
   const locked = lock.use(s => s.locked);
-  return locked ? <LockScreen /> : <Desktop />;
+  const reduced = app.use(s => s.reducedMotion);
+  // Motion follows the app's reduced-motion setting as well as the system one
+  return <MotionConfig reducedMotion={reduced ? 'always' : 'user'}>{locked ? <LockScreen /> : <Desktop />}</MotionConfig>;
 }
 
 function Desktop() {

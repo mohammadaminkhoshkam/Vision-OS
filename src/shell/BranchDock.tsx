@@ -3,7 +3,9 @@
 // hold live state in this run (an open paper, a paused video, a running focus timer, cards on the
 // board) show a small glowing dot, so the dock reads like a task bar of an OS rather than a menu.
 // On reading/video/board screens the dock tucks away until the mouse or hand cursor nears the edge.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { animate, motion, useMotionValue, useSpring, useTransform, type MotionValue } from 'motion/react';
+import { dockApps } from '../apps/registry';
 import { appData } from '../apps/data';
 import { isTauri, platform, type AppId } from '../platform';
 import { board } from '../board/store';
@@ -103,22 +105,29 @@ export function BranchDock() {
     focus: timer ? (timer.status === 'paused' ? 'Paused' : 'Running') : undefined,
   };
 
+  // the dock is built from the app registry; «Apps» opens the launcher tiles
   const items: Item[] = [
-    { id: 'schedule', icon: 'calendar', label: 'Planner', screen: 'planner', tab: 'schedule' },
-    { id: 'tasks', icon: 'tasks', label: 'Tasks', screen: 'planner', tab: 'tasks' },
-    { id: 'focus', icon: 'timer', label: 'Focus', screen: 'focus' },
-    { id: 'reader', icon: 'book', label: 'Reader', screen: 'reader' },
-    { id: 'home', icon: 'garden', label: 'Garden', screen: 'home' },
-    { id: 'cinema', icon: 'monitor', label: 'Video', screen: 'cinema' },
-    { id: 'board', icon: 'network', label: 'Knowledge board', screen: 'board' },
-    { id: 'library', icon: 'folder', label: 'Library', screen: 'library' },
-    { id: 'apps', icon: 'apps', label: 'Apps', run: () => setAppsOpen(v => !v) },
+    ...dockApps().map(a => ({ id: a.id, icon: a.icon, label: a.label, screen: a.screen, tab: a.tab })),
+    { id: 'apps', icon: 'apps' as IconName, label: 'Apps', run: () => setAppsOpen(v => !v) },
   ];
   const isActive = (it: Item) => (it.id === 'apps' ? appsOpen : it.screen === screen && (!it.tab || it.tab === tab));
 
+  // magnification (macOS-style, through Motion springs): pods swell as the mouse or the hand
+  // cursor passes along the dock; a pod bounces once when it opens a tool
+  const navRef = useRef<HTMLElement>(null);
+  const pointerX = useMotionValue(Infinity);
+  const [bounce, setBounce] = useState<{ id: string; n: number } | null>(null);
+  const trackX = (clientX: number | null) => {
+    const r = navRef.current?.getBoundingClientRect();
+    pointerX.set(r && clientX !== null ? clientX - r.left : Infinity);
+  };
+
   useVisionHandler(
     (e, px) => {
-      if (e.type === 'POINTER_MOVE' && px && compact) setPeek(px.y > innerHeight - (peek ? H + 40 : 70));
+      if (e.type === 'POINTER_MOVE' && px) {
+        if (compact) setPeek(px.y > innerHeight - (peek ? H + 40 : 70));
+        trackX(px.y > innerHeight - H - 30 ? px.x : null);
+      }
       return false;
     },
     [compact, peek],
@@ -131,11 +140,14 @@ export function BranchDock() {
   const nav = (
     <nav
       className={`branch-dock arc-dock ${open ? 'open' : 'tucked'} ${compact ? 'compact' : ''}`}
+      ref={navRef}
       style={{ width: W, height: H }}
       onMouseEnter={() => setPeek(true)}
+      onMouseMove={e => trackX(e.clientX)}
       onMouseLeave={() => {
         setPeek(false);
         setHover(null);
+        trackX(null);
       }}
     >
       <svg className="branch" viewBox={`${-ext} 0 ${W + 2 * ext} ${H}`} width={W + 2 * ext} height={H} style={{ left: -ext }} aria-hidden>
@@ -161,7 +173,7 @@ export function BranchDock() {
         const size = center ? 78 : 52;
         const detail = state[it.id];
         return (
-          <div key={it.id} className="pod-slot" style={{ left: p.x, top: p.y, ['--r' as string]: `${size / 2}px` }}>
+          <PodSlot key={it.id} x={p.x} y={p.y} size={size} pointerX={pointerX} bounce={bounce?.id === it.id ? bounce.n : 0}>
             {center && <span className="pod-halo" />}
             <button
               className={`pod ${active ? 'on' : ''} ${center ? 'center' : ''} ${detail ? 'has-live' : ''}`}
@@ -170,6 +182,7 @@ export function BranchDock() {
               onClick={e => {
                 if (it.run) return it.run();
                 setEnterOrigin(e.currentTarget);
+                if (it.screen !== screen) setBounce(b => ({ id: it.id, n: (b?.n ?? 0) + 1 }));
                 if (it.tab) app.set({ plannerTab: it.tab });
                 go(it.screen!);
                 setAppsOpen(false);
@@ -186,7 +199,7 @@ export function BranchDock() {
               {detail && hover === it.id && <small dir="auto">{detail.length > 34 ? detail.slice(0, 33) + '…' : detail}</small>}
             </span>
             {it.id === 'apps' && appsOpen && <AppsPopover onClose={() => setAppsOpen(false)} />}
-          </div>
+          </PodSlot>
         );
       })}
     </nav>
@@ -200,6 +213,22 @@ export function BranchDock() {
         </button>
       )}
     </>
+  );
+}
+
+/** One dock position: scales with the pointer distance (spring), bounces when it launches. */
+function PodSlot({ x, y, size, pointerX, bounce, children }: { x: number; y: number; size: number; pointerX: MotionValue<number>; bounce: number; children: React.ReactNode }) {
+  const dist = useTransform(pointerX, v => Math.abs(v - x));
+  const target = useTransform(dist, [0, 70, 150], [size > 60 ? 1.12 : 1.32, size > 60 ? 1.06 : 1.14, 1]);
+  const scale = useSpring(target, { stiffness: 320, damping: 24, mass: 0.6 });
+  const lift = useMotionValue(0);
+  useEffect(() => {
+    if (bounce) void animate(lift, [0, -16, 0, -6, 0], { duration: 0.7, ease: 'easeOut' });
+  }, [bounce, lift]);
+  return (
+    <motion.div className="pod-slot" style={{ left: x, top: y, scale, y: lift, ['--r' as string]: `${size / 2}px` }}>
+      {children}
+    </motion.div>
   );
 }
 

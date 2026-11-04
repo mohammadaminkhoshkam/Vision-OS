@@ -4,7 +4,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { appData } from '../apps/data';
 import { board } from '../board/store';
 import { loadList } from '../lib/store';
-import { app, go, openPaper, openVideo, type Screen } from '../state/app';
+import { app, go, openPaper, openVideo } from '../state/app';
+import { APPS } from '../apps/registry';
+import { layout } from '../state/layout';
+import { restoreSpace } from '../state/resume';
 import { Icon, type IconName } from '../ui/icons';
 import { normalize, parseCommand } from '../voice/commands';
 import { run } from '../voice/run';
@@ -18,15 +21,8 @@ interface Result {
   go: () => void;
 }
 
-const SCREENS: { s: Screen; t: string; icon: IconName; k: string }[] = [
-  { s: 'home', t: 'Garden', icon: 'garden', k: 'home garden' },
-  { s: 'reader', t: 'Read', icon: 'book', k: 'reader pdf read' },
-  { s: 'board', t: 'Knowledge board', icon: 'board', k: 'board canvas knowledge' },
-  { s: 'focus', t: 'Focus studio', icon: 'timer', k: 'focus timer pomodoro' },
-  { s: 'cinema', t: 'YouTube', icon: 'youtube', k: 'youtube video cinema' },
-  { s: 'calibrate', t: 'Gestures and calibration', icon: 'hand', k: 'gesture calibrate hand' },
-  { s: 'settings', t: 'Settings', icon: 'settings', k: 'settings preferences' },
-];
+// tools come from the app registry (one place declares every app)
+const SCREENS = APPS.map(a => ({ id: a.id, s: a.screen, tab: a.tab, t: a.label, icon: a.icon, k: a.keywords }));
 
 function score(hay: string, q: string) {
   const h = normalize(hay);
@@ -63,7 +59,11 @@ export function Launcher() {
     if (cmd) out.push({ id: 'cmd', icon: 'mic', title: `Run command: “${text}”`, sub: 'Command', group: 'Command', s: 100, go: () => run(cmd) });
     for (const sc of SCREENS) {
       const s = q ? score(`${sc.t} ${sc.k}`, q) : 1;
-      if (s) out.push({ id: `s-${sc.s}`, icon: sc.icon, title: sc.t, sub: 'Screen', group: 'Screens', s: s + 1, go: () => go(sc.s) });
+      if (s) out.push({ id: `s-${sc.id}`, icon: sc.icon, title: sc.t, sub: 'Tool', group: 'Tools', s: s + 1, go: () => (sc.tab && app.set({ plannerTab: sc.tab }), go(sc.s)) });
+    }
+    for (const w of layout.get().workspaces) {
+      const s = q ? score(`${w.name} space workspace`, q) : 0.8;
+      if (s) out.push({ id: `w-${w.id}`, icon: 'apps', title: w.name, sub: `Research space · ${w.main}${w.side ? ` + ${w.side}` : ''}`, group: 'Spaces', s: s + 0.8, go: () => void restoreSpace(w) });
     }
     for (const p of appData.get().papers) {
       const s = q ? score(`${p.title} ${p.authors} ${p.venue} ${p.year}`, q) : 0.5;
