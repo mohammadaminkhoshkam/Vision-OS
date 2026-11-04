@@ -17,6 +17,8 @@ import { Launcher } from './shell/Launcher';
 import { Workspace } from './shell/Workspace';
 import { CarryLayer } from './board/carry';
 import { watchNewPapers } from './discovery/store';
+import { watchSessions } from './focus/summary';
+import { SessionSummaryCard } from './focus/SessionSummary';
 import { AiPanel } from './ai/AiPanel';
 import { Companion } from './shell/Companion';
 import { FocusOverlay, FocusStudio } from './focus/FocusUI';
@@ -124,6 +126,7 @@ function Desktop() {
   }, [screen]);
 
   useEffect(() => watchNewPapers(), []);
+  useEffect(() => watchSessions(), []);
 
   useEffect(() => {
     void refreshAppData();
@@ -200,6 +203,7 @@ function Desktop() {
       {!focusMode && <SettingsPod />}
       <Companion />
       <FocusOverlay />
+      <SessionSummaryCard />
       <VisionHUD />
       <RadialMenu />
       <AiPanel />
