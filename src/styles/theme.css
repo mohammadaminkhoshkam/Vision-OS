@@ -1,0 +1,74 @@
+/* Garden theme tokens. Day = sunlit conservatory, Night = lantern-lit greenhouse.
+   Reading surfaces always use --paper / --paper-ink for contrast, whatever the theme. */
+:root {
+  --font: 'Inter Variable', 'Segoe UI', Tahoma, sans-serif;
+  --font-latin: 'Inter Variable', 'Segoe UI', sans-serif;
+
+  --ink: #2c3a2a;
+  --ink-2: #56634d;
+  --ink-3: #7d8770;
+  --moss: #4d7a43;
+  --leaf: #86b36b;
+  --leaf-soft: #dcebc8;
+  --crimson: #8f2d45;
+  --gold: #c38f2f;
+  --gold-soft: #f3dfae;
+  --sky: #4e9cc0;
+  --rose: #e48aa2;
+  --cream: #fbf4e2;
+
+  --glass: rgba(255, 252, 240, 0.74);
+  --glass-strong: rgba(255, 253, 246, 0.9);
+  --glass-line: rgba(255, 255, 255, 0.85);
+  --glass-edge: rgba(92, 74, 40, 0.14);
+  --shadow: 0 18px 40px -18px rgba(48, 66, 30, 0.45), 0 2px 6px rgba(48, 66, 30, 0.1);
+  --scrim: rgba(250, 244, 226, 0.55);
+
+  --paper: #fffdf7;
+  --paper-ink: #1f2420;
+  --paper-desk: #e9e1cc;
+
+  --ok: #4d8a45;
+  --warn: #c98a1c;
+  --danger: #b4423e;
+
+  --r-lg: 24px;
+  --r-md: 16px;
+  --r-sm: 11px;
+  --target: 46px;
+  --motion: 1;
+  color-scheme: light;
+}
+
+:root[data-theme='night'] {
+  --ink: #f2ead4;
+  --ink-2: #cdc4a8;
+  --ink-3: #9f9a85;
+  --moss: #8cc27a;
+  --leaf: #9fd28a;
+  --leaf-soft: rgba(140, 194, 122, 0.18);
+  --crimson: #e07a92;
+  --gold: #f0c56a;
+  --gold-soft: rgba(240, 197, 106, 0.2);
+  --sky: #8fcbe6;
+  --cream: #1c2a2c;
+
+  --glass: rgba(18, 36, 40, 0.72);
+  --glass-strong: rgba(16, 32, 36, 0.92);
+  --glass-line: rgba(255, 240, 200, 0.16);
+  --glass-edge: rgba(0, 0, 0, 0.35);
+  --shadow: 0 18px 44px -16px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --scrim: rgba(8, 20, 24, 0.55);
+
+  --paper-desk: #1d2b2d;
+  color-scheme: dark;
+}
+
+:root[data-motion='reduced'] {
+  --motion: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='full']) {
+    --motion: 0;
+  }
+}
