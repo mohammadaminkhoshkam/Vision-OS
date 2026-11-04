@@ -169,4 +169,4 @@ class VisionEngine {
 export const vision = new VisionEngine();
 
 // development only: lets automated UI tests replay gesture events without a camera
-if (import.meta.env.DEV) Object.assign(globalThis, { __vosVision: vision });
+if (import.meta.env.DEV) Object.assign(globalThis, { __vosVision: vision, __vosVisionStatus: visionStatus });
