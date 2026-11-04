@@ -3,21 +3,19 @@ import { lock, lockNow } from './lock/lock';
 import { current, focus } from './focus/store';
 import { LockScreen } from './lock/LockScreen';
 import { refreshAppData } from './apps/data';
-import { Cinema } from './cinema/Cinema';
 import { GardenLayers } from './garden/GardenLayers';
 import { GardenScene } from './garden/GardenScene';
 import { Home } from './home/Home';
 import { platform } from './platform';
-import { Reader } from './reader/Reader';
 import { BranchDock, FullscreenPod, SettingsPod } from './shell/BranchDock';
 import { TitleBar } from './shell/TitleBar';
 import { Library } from './screens/Library';
 import { Planner } from './screens/Planner';
 import { Settings, Toasts } from './shell/Shell';
 import { Launcher } from './shell/Launcher';
+import { Workspace } from './shell/Workspace';
 import { AiPanel } from './ai/AiPanel';
 import { Companion } from './shell/Companion';
-import { Board } from './board/Board';
 import { FocusOverlay, FocusStudio } from './focus/FocusUI';
 import { cancelPlacing, garden } from './garden/gardenState';
 import { app, go, setPrefs } from './state/app';
@@ -152,15 +150,13 @@ function Desktop() {
       <div className="scene-bloom" aria-hidden />
       <main className="stage">
         {screen === 'home' && <Home />}
-        {screen === 'reader' && <Reader />}
-        {screen === 'cinema' && <Cinema />}
         {screen === 'calibrate' && <Calibration />}
         {screen === 'settings' && <Settings />}
         {screen === 'focus' && <FocusStudio />}
-        {screen === 'board' && <Board />}
         {screen === 'library' && <Library />}
         {screen === 'planner' && <Planner />}
       </main>
+      <Workspace />
       {!focusMode && <BranchDock />}
       {!focusMode && <FullscreenPod />}
       {!focusMode && <SettingsPod />}

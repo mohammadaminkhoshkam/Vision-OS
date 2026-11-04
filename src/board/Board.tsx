@@ -5,6 +5,7 @@ import { appData } from '../apps/data';
 import { openPaper, openVideo, toast } from '../state/app';
 import { Icon, type IconName } from '../ui/icons';
 import { useRadialItems, useVisionHandler } from '../vision/router';
+import { usePane } from '../state/pane';
 import { fitView, link, moveNode, removeNode, unlink, updateNode, type BoardNode } from './model';
 import { addNote, board, commit, history, live, redo, setView, undo } from './store';
 import { openAssistant } from '../ai/store';
@@ -104,6 +105,9 @@ function Card({ n, selected, linking }: { n: BoardNode; selected: boolean; linki
 export function Board({ compact = false }: { compact?: boolean }) {
   const { doc, view, linking, selected, canUndo, canRedo } = board.use(s => s);
   const host = useRef<HTMLDivElement>(null);
+  const { active } = usePane();
+  const activeRef = useRef(active);
+  activeRef.current = active;
   const drag = useRef<null | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number } | { kind: 'node'; id: string; sx: number; sy: number; nx: number; ny: number }>(null);
 
   const local = (cx: number, cy: number) => {
@@ -145,6 +149,7 @@ export function Board({ compact = false }: { compact?: boolean }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (!activeRef.current) return;
       if (e.target instanceof Element && e.target.closest('input, textarea')) return;
       if (e.ctrlKey && e.key.toLowerCase() === 'z') (e.preventDefault(), undo());
       else if (e.ctrlKey && e.key.toLowerCase() === 'y') (e.preventDefault(), redo());

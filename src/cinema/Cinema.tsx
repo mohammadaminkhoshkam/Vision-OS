@@ -4,8 +4,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { loadList, saveJson } from '../lib/store';
 import { clipVideo } from '../board/store';
-import { app, controls, toast } from '../state/app';
+import { app, controls, go, toast } from '../state/app';
 import { touch } from '../state/workspace';
+import { isPane, layout, setSide } from '../state/layout';
+import { usePane } from '../state/pane';
 import { Icon } from '../ui/icons';
 import { useRadialItems, useVisionHandler } from '../vision/router';
 
@@ -85,13 +87,21 @@ export function Cinema() {
   const [note, setNote] = useState('');
   const [recent, setRecent] = useState<Recent[]>(() => loadList<Recent>('vos.yt.recent'));
   const seekDrag = useRef(false);
+  const { slot, active } = usePane();
+  const slotRef = useRef(slot);
+  slotRef.current = slot;
 
   // create the player once a video is chosen
   useEffect(() => {
     if (!videoId) return;
     setMarks(loadList<Mark>(`vos.yt.marks.${videoId}`));
     if (player.current) {
-      player.current.loadVideoById({ videoId, startSeconds: Number(localStorage.getItem(`vos.yt.pos.${videoId}`) ?? 0) });
+      const pv = pending.current?.id === videoId ? pending.current : null;
+      player.current.loadVideoById({ videoId, startSeconds: pv ? pv.t : Number(localStorage.getItem(`vos.yt.pos.${videoId}`) ?? 0) });
+      if (pv) {
+        pending.current = null;
+        app.set({ pendingVideo: null });
+      }
       return;
     }
     let dead = false;
@@ -117,6 +127,10 @@ export function Cinema() {
             },
             onStateChange: (e: { data: number }) => {
               setPlaying(e.data === 1);
+              // the workspace floats a started video when you leave it; pausing it on its own
+              // screen (or letting it end) means you are done with it for now
+              if (e.data === 1) layout.set({ playing: true });
+              else if (e.data === 0 || (e.data === 2 && slotRef.current !== 'pip')) layout.set({ playing: false });
               if (e.data === 1) rememberRecent();
             },
             onError: (e: { data: number }) => setError(`Player error code: ${e.data}`),
@@ -130,7 +144,33 @@ export function Cinema() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoId]);
 
-  useEffect(() => () => player.current?.destroy(), []);
+  useEffect(
+    () => () => {
+      player.current?.destroy();
+      layout.set({ playing: false });
+    },
+    [],
+  );
+
+  // the cinema stays mounted: a video opened elsewhere (board card, command bar, workspace) arrives here
+  const pendingVideo = app.use(s => s.pendingVideo);
+  useEffect(() => {
+    if (!pendingVideo) return;
+    pending.current = pendingVideo;
+    if (pendingVideo.id !== videoId) return setVideoId(pendingVideo.id);
+    if (ready && player.current) {
+      player.current.seekTo(pendingVideo.t, true);
+      pending.current = null;
+      app.set({ pendingVideo: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingVideo]);
+
+  // never play invisibly: a hidden player (focus studio, dismissed float) pauses
+  useEffect(() => {
+    if (slot === 'hidden' && playing) player.current?.pauseVideo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slot]);
 
   // poll time; resume position is remembered per video
   useEffect(() => {
@@ -201,7 +241,8 @@ export function Cinema() {
   };
 
   useEffect(() => {
-    controls.current = {
+    if (!active) return;
+    const c = (controls.current = {
       play: () => p()?.playVideo(),
       pause: () => p()?.pauseVideo(),
       seek: seekBy,
@@ -211,9 +252,9 @@ export function Cinema() {
         setInput(q);
         toast('YouTube search needs an API key; enter a video link instead', 'warn');
       },
-    };
+    });
     return () => {
-      controls.current = {};
+      if (controls.current === c) controls.current = {};
     };
   });
 
@@ -362,6 +403,44 @@ export function Cinema() {
           ))}
         </ul>
       </aside>
+      {slot === 'pip' && (
+        <div className="pip-bar">
+          <button className="ibtn" onClick={toggle} title={playing ? 'Pause' : 'Play'} aria-label={playing ? 'Pause' : 'Play'}>
+            <Icon name={playing ? 'pause' : 'play'} fill />
+          </button>
+          <span className="pip-title" dir="auto">
+            {player.current?.getVideoData?.().title ?? 'Video'}
+          </span>
+          <span className="yt-time" dir="ltr">
+            {fmt(time)}
+          </span>
+          <button
+            className="ibtn"
+            onClick={() => {
+              setSide('cinema');
+              if (!isPane(app.get().screen)) go(app.get().doc ? 'reader' : 'board');
+            }}
+            title="Play beside your reading or board"
+            aria-label="Play beside your reading or board"
+          >
+            <Icon name="split" />
+          </button>
+          <button className="ibtn" onClick={() => go('cinema')} title="Open the video screen" aria-label="Open the video screen">
+            <Icon name="expand" />
+          </button>
+          <button
+            className="ibtn"
+            onClick={() => {
+              p()?.pauseVideo();
+              layout.set({ pipDismissed: true, playing: false });
+            }}
+            title="Close the floating player"
+            aria-label="Close the floating player"
+          >
+            <Icon name="close" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

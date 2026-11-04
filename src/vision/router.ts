@@ -3,6 +3,7 @@
 // falls through to generic behaviour (hover/click on the element under the cursor, scroll).
 import { useEffect } from 'react';
 import { createStore } from '../lib/store';
+import { usePane } from '../state/pane';
 import { vision } from './engine';
 import type { VisionEvent } from './types';
 
@@ -43,7 +44,7 @@ function findTarget(p: Px): Element | null {
   let best: Element | null = null;
   let bestD = 40;
   for (const el of document.querySelectorAll(TARGETS)) {
-    if (el.closest('[data-vision-ignore]')) continue;
+    if (el.closest('[data-vision-ignore], [inert]')) continue;
     const r = el.getBoundingClientRect();
     if (!r.width || !r.height) continue;
     const dx = Math.max(r.left - p.x, 0, p.x - r.right);
@@ -159,25 +160,31 @@ vision.on(handle);
 
 /** Register a context handler for the lifetime of a component. Return true to consume an event. */
 export function useVisionHandler(handler: ContextHandler, deps: unknown[] = []) {
+  // a pane that is hidden or floating does not take gestures
+  const { visible } = usePane();
   useEffect(() => {
+    if (!visible) return;
     handlers.push(handler);
     return () => {
       const i = handlers.lastIndexOf(handler);
       if (i >= 0) handlers.splice(i, 1);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+  }, [...deps, visible]);
 }
 
 /** Context-specific radial menu entries (e.g. Highlight in the reader, Seek in cinema). */
 export function useRadialItems(items: RadialItem[], deps: unknown[] = []) {
+  // only the active pane fills the radial menu
+  const { active } = usePane();
   useEffect(() => {
+    if (!active) return;
     contextItems = items;
     return () => {
       if (contextItems === items) contextItems = [];
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+  }, [...deps, active]);
 }
 
 export function setGlobalRadialItems(items: RadialItem[]) {

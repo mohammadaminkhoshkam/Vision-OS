@@ -1,5 +1,6 @@
 // Library: every paper from Marginal (open at the last page, with the board, or with a focus
 // timer), opening a local PDF, and one list of all highlights, bookmarks and board notes.
+import { setSide } from '../state/layout';
 import { useMemo, useState } from 'react';
 import { appData } from '../apps/data';
 import { board } from '../board/store';
@@ -73,7 +74,7 @@ function Papers() {
                   <button className="btn small primary" onClick={() => openPaper(p)} disabled={!p.pdf}>
                     <Icon name="book" size={16} /> Continue reading
                   </button>
-                  <button className="btn small" onClick={() => (app.set({ split: true }), openPaper(p))} disabled={!p.pdf}>
+                  <button className="btn small" onClick={() => (setSide('board'), openPaper(p))} disabled={!p.pdf}>
                     <Icon name="split" size={16} /> With the board
                   </button>
                   <button className="btn small" onClick={() => (focusOnPaper({ kind: 'paper', id: p.id, title: p.title }), openPaper(p))} disabled={!p.pdf}>

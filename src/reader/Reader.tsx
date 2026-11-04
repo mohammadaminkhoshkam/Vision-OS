@@ -6,10 +6,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { platform } from '../platform';
 import { app, controls, toast } from '../state/app';
 import { touch } from '../state/workspace';
+import { storeFileDoc } from '../state/fileStore';
+import { layout, setSide } from '../state/layout';
+import { usePane } from '../state/pane';
 import { Icon } from '../ui/icons';
 import { cursorPx, useRadialItems, useVisionHandler, type Px } from '../vision/router';
 import { loadNotes, mergeLineRects, saveNotes, uid, type DocNotes, type NRect } from './annotations';
-import { Board } from '../board/Board';
 import type { Source } from '../board/model';
 import { clipFigure, clipText, cropToDataUrl } from '../board/store';
 import { openAssistant } from '../ai/store';
@@ -190,7 +192,11 @@ function snapToText(pageEl: HTMLElement, a: [number, number], b: [number, number
 export function Reader() {
   const docRef = app.use(s => s.doc);
   const focus = app.use(s => s.focus);
-  const split = app.use(s => s.split);
+  const { slot, active } = usePane();
+  const sidePane = layout.use(s => s.side);
+  // the board (or video) shares the screen: the bookmarks column steps aside to give the page room
+  const beside = slot === 'side' || (slot === 'main' && !!sidePane && sidePane !== 'reader');
+  const split = sidePane === 'board' && slot === 'main';
   const [pdf, setPdf] = useState<pdfjs.PDFDocumentProxy | null>(null);
   const [baseSize, setBaseSize] = useState({ w: 612, h: 792 });
   const [scale, setScale] = useState(1.25);
@@ -387,15 +393,27 @@ export function Reader() {
 
   // imperative controls for voice / command bar
   useEffect(() => {
-    controls.current = { page: turn, gotoPage: n => goto(n), zoom: d => zoom(d > 0 ? 1.15 : 1 / 1.15), bookmark, ask: a => void askAI(a as Action) };
+    if (!active) return;
+    const c = { page: turn, gotoPage: (n: number) => goto(n), zoom: (d: number) => zoom(d > 0 ? 1.15 : 1 / 1.15), bookmark, ask: (a: string) => void askAI(a as Action) };
+    controls.current = c;
     return () => {
-      controls.current = {};
+      if (controls.current === c) controls.current = {};
     };
   });
+
+  // a jump requested for the already-open document (board card, garden, «resume»)
+  const pendingPage = app.use(s => s.pendingPage);
+  useEffect(() => {
+    if (!pdf || pendingPage === null) return;
+    app.set({ pendingPage: null });
+    setTimeout(() => goto(pendingPage), 30);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingPage, pdf]);
 
   // keyboard
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (!active) return;
       if (e.target instanceof Element && e.target.closest('input, textarea, select')) return;
       if (e.key === 'j' || e.key === 'PageDown') turn(1);
       else if (e.key === 'k' || e.key === 'PageUp') turn(-1);
@@ -503,7 +521,10 @@ export function Reader() {
 
   const openFile = async (f: File | undefined) => {
     if (!f) return;
-    app.set({ doc: { source: 'file', name: f.name, data: await f.arrayBuffer() } });
+    const data = await f.arrayBuffer();
+    app.set({ doc: { source: 'file', name: f.name, data } });
+    // keep a local copy so the file can be resumed after a restart
+    void storeFileDoc(`f-${f.name}-${data.byteLength}`, f.name, data);
   };
 
   if (!docRef) {
@@ -566,7 +587,7 @@ export function Reader() {
           <button className={`ibtn ${tool === 'clip' ? 'on' : ''}`} onClick={() => setTool(tool === 'clip' ? 'select' : 'clip')} title="Clip a figure or chart to the board (draw around it)">
             <Icon name="scissors" />
           </button>
-          <button className={`ibtn ${split ? 'on' : ''}`} onClick={() => app.set({ split: !split })} title="Split view: PDF + knowledge board">
+          <button className={`ibtn ${split ? 'on' : ''}`} onClick={() => setSide(split ? null : 'board')} title="Knowledge board beside the paper">
             <Icon name="split" />
           </button>
           <button className={`ibtn ${tool === 'pen' ? 'on' : ''}`} onClick={() => setTool(tool === 'pen' ? 'select' : 'pen')} title="Pen">
@@ -592,7 +613,7 @@ export function Reader() {
       </div>
 
       <div className="reader-body">
-        {!focus && !split && (
+        {!focus && !beside && (
           <aside className="reader-side">
             <h4>Bookmarks</h4>
             {notes.bookmarks.length === 0 && <p className="muted small">No bookmarks yet</p>}
@@ -636,11 +657,6 @@ export function Reader() {
             ))}
           {selRect && (tool === 'highlight' || tool === 'clip') && <SelectionBox sel={selRect} />}
         </div>
-        {split && (
-          <aside className="reader-split">
-            <Board compact />
-          </aside>
-        )}
       </div>
       {lens && lensAt && <canvas ref={lensCanvas} width={260} height={260} className="lens" style={{ left: lensAt.x - 130, top: lensAt.y - 290 }} />}
     </div>

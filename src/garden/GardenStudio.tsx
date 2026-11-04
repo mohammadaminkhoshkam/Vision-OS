@@ -1,11 +1,12 @@
 // Garden Studio panel, plant Inspect card (BM-02/03), garden journal (BM-05 lite) and the
 // paper action card (every knowledge flower leads to real work, not just decoration).
+import { setSide } from '../state/layout';
 import { useState } from 'react';
 import { appData } from '../apps/data';
 import { focusOnPaper } from '../focus/FocusUI';
 import { balance } from '../focus/engine';
 import { focus } from '../focus/store';
-import { app, openPaper, toast } from '../state/app';
+import { openPaper, toast } from '../state/app';
 import { Icon } from '../ui/icons';
 import { beginPlacing, cancelPlacing, garden, isThirsty, isUnlocked, redoGarden, removeDecor, setCareSim, undoGarden, unlock, water } from './gardenState';
 import { paperProgress } from './KnowledgeGarden';
@@ -254,7 +255,7 @@ export function PaperActions() {
           className="btn"
           onClick={() => {
             garden.set({ picked: null });
-            app.set({ split: true });
+            setSide('board');
             openPaper(paper);
           }}
         >

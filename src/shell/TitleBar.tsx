@@ -6,6 +6,7 @@ import { isTauri, platform } from '../platform';
 import { notes, markSeen, clearNotes, unread } from '../state/notifications';
 import { app, go, setPrefs } from '../state/app';
 import { Icon } from '../ui/icons';
+import { WorkspaceTabs } from './WorkspaceTabs';
 import { runText } from '../voice/run';
 import { listen, stopListening, voiceState } from '../voice/voice';
 
@@ -150,8 +151,9 @@ export function TitleBar() {
       <header className="titlebar" data-tauri-drag-region>
         <div className="tb-brand" data-tauri-drag-region>
           <Icon name="leaf" size={22} />
-          <span data-tauri-drag-region>Research management system</span>
+          <span data-tauri-drag-region>Vision OS</span>
         </div>
+        <WorkspaceTabs />
         <div className="tb-drag" data-tauri-drag-region />
         {isTauri && (
           <div className="tb-win">

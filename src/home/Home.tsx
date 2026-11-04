@@ -13,7 +13,8 @@ import { garden } from '../garden/gardenState';
 import { paperProgress } from '../garden/KnowledgeGarden';
 import { platform } from '../platform';
 import { loadNotes } from '../reader/annotations';
-import { app, go, openPaper, openVideo, toast } from '../state/app';
+import { app, go, openPaper, toast } from '../state/app';
+import { resumeActivity } from '../state/resume';
 import { describeActivity, nextAction, relativeTime, workspace, type Activity } from '../state/workspace';
 import { Icon, type IconName } from '../ui/icons';
 import { useVisionHandler } from '../vision/router';
@@ -49,23 +50,6 @@ function StatusStrip() {
       <WeatherPill />
     </div>
   );
-}
-
-/** Reopen an activity exactly where it was left. */
-export function resumeActivity(a: Activity, opts: { split?: boolean } = {}) {
-  if (a.kind === 'video') return openVideo(a.id, a.t ?? 0);
-  const doc = app.get().doc;
-  if (a.kind === 'paper') {
-    const paper = appData.get().papers.find(p => p.id === a.id) ?? (doc?.source === 'marginal' && doc.paper.id === a.id ? doc.paper : null);
-    if (!paper) return toast('That paper is no longer in the Marginal library', 'warn');
-    openPaper(paper, a.page);
-  } else {
-    // a local PDF lives only in memory; after a restart it has to be picked again
-    const same = doc?.source === 'file' && `f-${doc.name}-${doc.data.byteLength}` === a.id;
-    if (!same) toast('Open the file again to continue; your highlights are kept', 'info');
-    go('reader');
-  }
-  app.set({ split: !!opts.split });
 }
 
 function useActivityStats(a: Activity | null) {
