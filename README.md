@@ -1,6 +1,8 @@
 # Vision OS
 
-**A full-screen, vision-first research workspace for Windows, controlled with hand gestures from an ordinary webcam.**
+**A living research workspace for Windows: read, connect and focus in a greenhouse that responds to your work, controlled with the mouse or with hand gestures from an ordinary webcam.**
+
+[![Latest release](https://img.shields.io/github/v/release/mohammadaminkhoshkam/Vision-OS?label=release)](https://github.com/mohammadaminkhoshkam/Vision-OS/releases/latest) · [Download for Windows](https://github.com/mohammadaminkhoshkam/Vision-OS/releases/latest) · [What's new in 0.5](CHANGELOG.md)
 
 Vision OS is a desktop shell (Tauri + React) that feels like a separate operating system: a lantern-lit greenhouse home screen, a PDF reader, a knowledge board, a focus studio, a YouTube player with timed notes, voice and typed commands, an optional face lock and a local AI research assistant. It also brings together my other apps, [Marginal Research](https://github.com/mohammadaminkhoshkam/Marginal-Research), [HabitWall](https://github.com/mohammadaminkhoshkam/HabitWall) and [Rooznegar](https://github.com/mohammadaminkhoshkam/Rooznegar), by reading their data (read-only).
 
@@ -52,6 +54,10 @@ It is not a kernel or a standalone OS. It runs on top of Windows, and everything
 - [Ollama](https://ollama.com/download), for the AI assistant (optional)
 
 ## Install and run
+
+**Windows installer:** download `Vision OS_0.5.0_x64-setup.exe` from the [latest release](https://github.com/mohammadaminkhoshkam/Vision-OS/releases/latest) and run it. Windows SmartScreen may warn because the installer is not code-signed; choose *More info → Run anyway*.
+
+**From source:**
 
 ```bash
 npm install          # dependencies; also copies the MediaPipe and pdf.js runtime files into public/
@@ -136,9 +142,15 @@ Speech recognition is often unavailable inside WebView2, but the command bar (`C
 ## Development
 
 ```bash
-npm test             # unit tests: gesture state machine, command parser, focus engine, board, garden, face matching, prompts, Rooznegar summary
+npm test             # unit tests: gestures, tutorial, workspace layout, board, discovery, garden growth, companion, focus, study analysis and more
 npm run typecheck
+npm run build
 ```
+
+### Releasing
+
+1. Bump the version in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`, and add a section to [CHANGELOG.md](CHANGELOG.md).
+2. Push a tag such as `v0.5.0`. The *Release* workflow publishes a GitHub release with that CHANGELOG section as its notes, then builds the Windows installer and attaches it.
 
 ## Design inspirations
 
