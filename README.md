@@ -55,7 +55,7 @@ It is not a kernel or a standalone OS. It runs on top of Windows, and everything
 
 ## Install and run
 
-**Windows installer:** download `Vision OS_0.5.0_x64-setup.exe` from the [latest release](https://github.com/mohammadaminkhoshkam/Vision-OS/releases/latest) and run it. Windows SmartScreen may warn because the installer is not code-signed; choose *More info → Run anyway*.
+**Windows installer:** download `Vision.OS_0.5.0_x64-setup.exe` from the [latest release](https://github.com/mohammadaminkhoshkam/Vision-OS/releases/latest) and run it. Windows SmartScreen may warn because the installer is not code-signed; choose *More info → Run anyway*.
 
 **From source:**
 
