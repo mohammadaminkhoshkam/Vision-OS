@@ -1,15 +1,23 @@
-// Garden Home (reference layout): three glass cards on the left, greeting/clock/date/weather
-// and quick navigation on the right, the lit planter with «Library» in the centre.
-import { useEffect, useState } from 'react';
+// Garden Home: built around the work in progress, not the clock. The left column answers
+// «what am I doing and what is the best next step?» (session hero), with a quiet status strip
+// above it; the right column holds secondary context (recent work, time today, habits). The
+// lit planter with «Library» stays in the centre of the scene.
+import { useEffect, useMemo, useState } from 'react';
 import { appData } from '../apps/data';
 import { describe, refreshWeather, weather } from '../apps/weather';
-import { stats } from '../focus/engine';
-import { focus, todayKey } from '../focus/store';
-import { GardenStudio, InspectCard, PaperActions } from '../garden/GardenStudio';
+import { board } from '../board/store';
+import { remainingSec, stats } from '../focus/engine';
+import { current, focus, start, todayKey, useNow } from '../focus/store';
+import { GardenStudio, InspectCard, PaperActions, ThreadCard } from '../garden/GardenStudio';
 import { garden } from '../garden/gardenState';
 import { paperProgress } from '../garden/KnowledgeGarden';
 import { platform } from '../platform';
+import { loadNotes } from '../reader/annotations';
 import { app, go, openPaper, toast } from '../state/app';
+import { resumeActivity } from '../state/resume';
+import { GettingStarted } from '../onboarding/GettingStarted';
+import { JourneyCard } from '../garden/Journey';
+import { describeActivity, nextAction, relativeTime, workspace, type Activity } from '../state/workspace';
 import { Icon, type IconName } from '../ui/icons';
 import { useVisionHandler } from '../vision/router';
 
@@ -25,24 +33,151 @@ function useClock(ms = 1000) {
   return now;
 }
 
-function Hero() {
+/** Quiet status strip: greeting, time and date in one line; the work gets the big type. */
+function StatusStrip() {
   const now = useClock(10000);
   const h = now.getHours();
   const night = h < 5 || h >= 19;
+  const name = app.use(s => s.userName);
   const greet = h < 5 ? 'Good night' : h < 11 ? 'Good morning' : h < 16 ? 'Good afternoon' : h < 19 ? 'Good evening' : 'Good night';
   return (
-    <div className="hero">
-      <div className="hero-greet">
-        <span>{greet}</span>
-        <span className="hero-sun">
-          <Icon name={night ? 'moon' : 'sun'} size={26} />
-        </span>
-      </div>
-      <div className="hero-time">{now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })}</div>
-      <div className="hero-date">
-        <span>{now.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
-      </div>
+    <div className="status-strip">
+      <span className="ss-greet">
+        <Icon name={night ? 'moon' : 'sun'} size={18} />
+        {greet}
+        {name ? `, ${name}` : ''}
+      </span>
+      <span className="ss-time">{now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+      <span className="ss-date">{now.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+      <WeatherPill />
     </div>
+  );
+}
+
+function useActivityStats(a: Activity | null) {
+  const nodes = board.use(s => s.doc.nodes);
+  return useMemo(() => {
+    if (!a || a.kind === 'video') return { notes: 0, cards: a ? nodes.filter(n => n.source?.kind === 'video' && n.source.videoId === a.id).length : 0 };
+    const docId = a.kind === 'paper' ? `m-${a.id}` : a.id;
+    const n = loadNotes(docId);
+    const cards = nodes.filter(x => x.source?.kind === 'pdf' && (x.source.docId === docId || (a.kind === 'paper' && x.source.paperId === a.id))).length;
+    return { notes: n.highlights.length + n.bookmarks.length, cards };
+  }, [a, nodes]);
+}
+
+const plural = (n: number, w: string) => `${fa.format(n)} ${w}${n === 1 ? '' : 's'}`;
+
+/** The heart of Home: the current session and the single best next step. */
+function SessionHero() {
+  const recent = workspace.use(s => s.recent);
+  const { tasks, defaultMinutes } = focus.use(s => s);
+  focus.use(s => s.sessions);
+  const now = useNow(15000);
+  const last = recent[0] ?? null;
+  const running = current();
+  const today = todayKey(new Date(now));
+  const next = nextAction({
+    last,
+    focus: running ? { title: running.link?.title ?? running.tag, remainingSec: running.mode === 'pomodoro' ? remainingSec(running, now) : null } : null,
+    tasks: tasks.filter(t => !t.day || t.day === today),
+    now: new Date(now),
+  });
+  const st = useActivityStats(last);
+  const prog = last?.pages && last.page ? Math.min(1, last.page / last.pages) : 0;
+
+  const heading = { focus: 'You’re in a focus session', task: 'Coming up next', resume: 'Continue where you left off', start: 'Start your session' }[next.kind];
+  const focusOn = (a: Activity) => {
+    start('pomodoro', defaultMinutes, 'Reading', { kind: a.kind === 'video' ? 'video' : 'paper', id: a.id, title: a.title });
+    resumeActivity(a);
+  };
+
+  return (
+    <section className={`session-hero kind-${next.kind}`} aria-labelledby="sh-title">
+      <div className="sh-eyebrow">
+        <span className="sh-live" aria-hidden />
+        Your current session
+      </div>
+      <h2 id="sh-title">{heading}</h2>
+
+      {next.kind !== 'resume' && next.kind !== 'start' && (
+        <div className="sh-next">
+          <Icon name={next.kind === 'focus' ? 'timer' : 'calendar'} size={18} />
+          {/* a focus session on the paper below needs no second title */}
+          {!(next.kind === 'focus' && running?.link?.id === last?.id) && <span dir="auto">{next.title}</span>}
+          <small>{next.detail}</small>
+        </div>
+      )}
+
+      {last ? (
+        <div className="sh-work">
+          <div className="sh-work-head">
+            <span className="sh-kind">
+              <Icon name={last.kind === 'video' ? 'youtube' : 'file'} size={22} />
+            </span>
+            <div className="sh-work-text">
+              <div className="sh-title" dir="auto">
+                {last.title}
+              </div>
+              <div className="sh-meta">
+                {describeActivity(last)}
+                {st.notes > 0 && <> · {plural(st.notes, 'saved note')}</>}
+                {st.cards > 0 && <> · {plural(st.cards, 'board card')}</>}
+                <> · {relativeTime(last.at, now)}</>
+              </div>
+            </div>
+          </div>
+          {last.kind !== 'video' && last.pages ? (
+            <div className="sh-progress" aria-label={`${Math.round(prog * 100)}% read`}>
+              <span style={{ width: `${Math.round(prog * 100)}%` }} />
+            </div>
+          ) : null}
+          <div className="sh-actions">
+            {next.kind === 'focus' && running?.link && running.link.id !== last.id ? null : (
+              <button className="sh-btn primary" onClick={() => resumeActivity(last)}>
+                <Icon name={last.kind === 'video' ? 'play' : 'book'} size={18} />
+                {last.kind === 'video' ? 'Resume video' : 'Resume reading'}
+              </button>
+            )}
+            {last.kind !== 'video' && (
+              <button className="sh-btn" onClick={() => resumeActivity(last, { split: true })} title="Paper and knowledge board side by side">
+                <Icon name="split" size={18} />
+                With board
+              </button>
+            )}
+            {!running && (
+              <button className="sh-btn" onClick={() => focusOn(last)} title={`Start a ${defaultMinutes}-minute focus session on this`}>
+                <Icon name="timer" size={18} />
+                Focus {fa.format(defaultMinutes)} min
+              </button>
+            )}
+            {next.kind === 'focus' && (
+              <button className="sh-btn" onClick={() => go('focus')}>
+                <Icon name="timer" size={18} />
+                Focus studio
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="sh-work empty">
+          <p className="sh-meta">Nothing in progress yet. Open a paper and Vision OS will keep your place, your notes and your board together.</p>
+          <div className="sh-actions">
+            <button className="sh-btn primary" onClick={() => go('library')}>
+              <Icon name="folder" size={18} />
+              Open the library
+            </button>
+            <button className="sh-btn" onClick={() => go('reader')}>
+              <Icon name="file" size={18} />
+              Open a PDF
+            </button>
+            <button className="sh-btn" onClick={() => go('focus')}>
+              <Icon name="timer" size={18} />
+              Focus session
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -90,42 +225,58 @@ function QuickNav() {
   );
 }
 
-function ReadingCard() {
+/** Other work in progress (the current item is already in the hero). */
+function RecentCard() {
+  const recent = workspace.use(s => s.recent);
   const { papers, marginal, loaded } = appData.use(s => s);
-  const p = papers[0];
+  const now = Date.now();
+  const others = recent.slice(1, 4);
+  // with no history yet, suggest papers that are part-way through
+  const suggestions = others.length ? [] : papers.filter(p => paperProgress(p) > 0 && paperProgress(p) < 1).slice(0, 3);
   return (
     <section className="card hcard">
       <header className="card-h">
         <Icon name="book" />
-        <h3>Continue reading</h3>
+        <h3>{others.length ? 'Also in progress' : 'Pick up a paper'}</h3>
       </header>
-      {!loaded && <p className="muted">Reading the library…</p>}
-      {loaded && (!marginal || !p) && (
+      {!loaded && !others.length && <p className="muted">Reading the library…</p>}
+      {loaded && !others.length && !suggestions.length && (
         <button className="hc-empty" onClick={() => go('library')}>
-          No Marginal data found; open the library
+          {marginal ? 'Browse the library' : 'No Marginal data found; open the library'}
         </button>
       )}
-      {p && (
-        <button className="hc-paper" onClick={() => openPaper(p)} disabled={!p.pdf} title="Open at the last page">
-          <span className="hc-thumb">
-            <Icon name="file" size={26} />
-          </span>
-          <span className="hc-paper-text">
-            <span className="paper-title" dir="auto">
-              {p.title}
-            </span>
-            <span className="paper-meta" dir="auto">
-              {p.authors?.split(',').slice(0, 2).join(' &')} · {p.year} · page {fa.format(p.lastPage || 1)}
-            </span>
-          </span>
-          <span className="hc-progress">
-            <span className="bar">
-              <span style={{ width: `${Math.round(paperProgress(p) * 100)}%` }} />
-            </span>
-            <b>{fa.format(Math.round(paperProgress(p) * 100))}%</b>
-          </span>
-        </button>
-      )}
+      <ul className="recent-list">
+        {others.map(a => (
+          <li key={`${a.kind}-${a.id}`}>
+            <button className="recent-row" onClick={() => resumeActivity(a)}>
+              <Icon name={a.kind === 'video' ? 'youtube' : 'file'} size={18} />
+              <span className="rr-text">
+                <span className="paper-title" dir="auto">
+                  {a.title}
+                </span>
+                <span className="paper-meta">
+                  {describeActivity(a)} · {relativeTime(a.at, now)}
+                </span>
+              </span>
+            </button>
+          </li>
+        ))}
+        {suggestions.map(p => (
+          <li key={p.id}>
+            <button className="recent-row" onClick={() => openPaper(p)} disabled={!p.pdf}>
+              <Icon name="file" size={18} />
+              <span className="rr-text">
+                <span className="paper-title" dir="auto">
+                  {p.title}
+                </span>
+                <span className="paper-meta">
+                  Page {fa.format(p.lastPage || 1)} · {fa.format(Math.round(paperProgress(p) * 100))}% read
+                </span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -253,19 +404,22 @@ export function Home() {
   return (
     <div className="home">
       <div className="home-left">
-        <Hero />
-        <WeatherPill />
+        <StatusStrip />
+        <SessionHero />
         <QuickNav />
         <GardenStudio />
       </div>
       <div className="home-cards">
-        <ReadingCard />
+        <GettingStarted />
+        <RecentCard />
         <TimeCard />
         <HabitsCard />
+        <JourneyCard />
       </div>
       <FlowerCard />
       <InspectCard />
       <PaperActions />
+      <ThreadCard />
     </div>
   );
 }

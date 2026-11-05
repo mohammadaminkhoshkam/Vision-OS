@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../ui/icons';
 import { vision, visionStatus } from './engine';
+import { openTutorial } from './GestureTutorial';
 import type { Side } from './types';
 import { defaultSettings } from './types';
 
@@ -87,6 +88,9 @@ export function Calibration() {
           <span className="card-src" dir="ltr">
             {s.fps} fps · {s.hands} hand(s)
           </span>
+          <button className="btn small primary" onClick={openTutorial} title="A two-minute practice run of every gesture">
+            <Icon name="hand" size={16} /> Practice gestures
+          </button>
         </header>
         <div className="cam-wrap">
           <canvas ref={canvas} width={640} height={480} />

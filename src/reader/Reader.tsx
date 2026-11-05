@@ -4,11 +4,18 @@ import * as pdfjs from 'pdfjs-dist';
 import 'pdfjs-dist/web/pdf_viewer.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { platform } from '../platform';
-import { app, controls, toast } from '../state/app';
+import { app, controls, openPaper, toast } from '../state/app';
+import { touch } from '../state/workspace';
+import { storeFileDoc } from '../state/fileStore';
+import { carryProps } from '../board/carry';
+import { CLIP_MIME } from '../board/model';
+import { RelatedList } from '../garden/GardenStudio';
+import { applyProjectMood } from '../garden/Journey';
+import { layout, setSide } from '../state/layout';
+import { usePane } from '../state/pane';
 import { Icon } from '../ui/icons';
 import { cursorPx, useRadialItems, useVisionHandler, type Px } from '../vision/router';
 import { loadNotes, mergeLineRects, saveNotes, uid, type DocNotes, type NRect } from './annotations';
-import { Board } from '../board/Board';
 import type { Source } from '../board/model';
 import { clipFigure, clipText, cropToDataUrl } from '../board/store';
 import { openAssistant } from '../ai/store';
@@ -189,7 +196,11 @@ function snapToText(pageEl: HTMLElement, a: [number, number], b: [number, number
 export function Reader() {
   const docRef = app.use(s => s.doc);
   const focus = app.use(s => s.focus);
-  const split = app.use(s => s.split);
+  const { slot, active } = usePane();
+  const sidePane = layout.use(s => s.side);
+  // the board (or video) shares the screen: the bookmarks column steps aside to give the page room
+  const beside = slot === 'side' || (slot === 'main' && !!sidePane && sidePane !== 'reader');
+  const split = sidePane === 'board' && slot === 'main';
   const [pdf, setPdf] = useState<pdfjs.PDFDocumentProxy | null>(null);
   const [baseSize, setBaseSize] = useState({ w: 612, h: 792 });
   const [scale, setScale] = useState(1.25);
@@ -238,6 +249,9 @@ export function Reader() {
         app.set({ pendingPage: null });
         const start = pending ?? (docRef.source === 'marginal' ? Math.max(saved.lastPage, docRef.paper.lastPage || 1) : saved.lastPage);
         setTimeout(() => goto(start, 'auto'), 60);
+        remember(start, doc.numPages);
+        // a project can carry its own environment
+        if (docRef.source === 'marginal') applyProjectMood(docRef.paper.collection);
       } catch (e) {
         setError(String(e));
       }
@@ -352,6 +366,25 @@ export function Reader() {
       return lh ? { ...n, highlights: n.highlights.slice(0, -1) } : n;
     });
 
+  // when the pane is resized (board opened beside it, splitter dragged) keep the page fitting:
+  // zoom follows the width change, so a page that filled the pane still fills it
+  useEffect(() => {
+    const sc = scroller.current;
+    if (!sc || !pdf || typeof ResizeObserver === 'undefined') return;
+    let last = sc.clientWidth;
+    const ro = new ResizeObserver(() => {
+      const w = sc.clientWidth;
+      if (!w || !last || Math.abs(w - last) < 24) return;
+      const k = w / last;
+      last = w;
+      const ratio = sc.scrollTop / Math.max(1, sc.scrollHeight);
+      setScale(v => Math.min(4, Math.max(0.4, v * k)));
+      requestAnimationFrame(() => requestAnimationFrame(() => (sc.scrollTop = ratio * sc.scrollHeight)));
+    });
+    ro.observe(sc);
+    return () => ro.disconnect();
+  }, [pdf]);
+
   // track the current page while scrolling and remember it
   useEffect(() => {
     const sc = scroller.current;
@@ -369,18 +402,43 @@ export function Reader() {
     if (pdf && page !== notes.lastPage) update(n => ({ ...n, lastPage: page }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
+  // the workspace remembers where you are, so Home can offer «continue where you left off»
+  const remember = (n: number, total: number) => {
+    if (!docRef) return;
+    touch(
+      docRef.source === 'marginal'
+        ? { kind: 'paper', id: docRef.paper.id, title: docRef.paper.title, page: n, pages: total }
+        : { kind: 'file', id: docId, title: docRef.name, page: n, pages: total },
+    );
+  };
+  useEffect(() => {
+    if (pdf) remember(page, pdf.numPages);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
   // imperative controls for voice / command bar
   useEffect(() => {
-    controls.current = { page: turn, gotoPage: n => goto(n), zoom: d => zoom(d > 0 ? 1.15 : 1 / 1.15), bookmark, ask: a => void askAI(a as Action) };
+    if (!active) return;
+    const c = { page: turn, gotoPage: (n: number) => goto(n), zoom: (d: number) => zoom(d > 0 ? 1.15 : 1 / 1.15), bookmark, ask: (a: string) => void askAI(a as Action) };
+    controls.current = c;
     return () => {
-      controls.current = {};
+      if (controls.current === c) controls.current = {};
     };
   });
+
+  // a jump requested for the already-open document (board card, garden, «resume»)
+  const pendingPage = app.use(s => s.pendingPage);
+  useEffect(() => {
+    if (!pdf || pendingPage === null) return;
+    app.set({ pendingPage: null });
+    setTimeout(() => goto(pendingPage), 30);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingPage, pdf]);
 
   // keyboard
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (!active) return;
       if (e.target instanceof Element && e.target.closest('input, textarea, select')) return;
       if (e.key === 'j' || e.key === 'PageDown') turn(1);
       else if (e.key === 'k' || e.key === 'PageUp') turn(-1);
@@ -488,7 +546,10 @@ export function Reader() {
 
   const openFile = async (f: File | undefined) => {
     if (!f) return;
-    app.set({ doc: { source: 'file', name: f.name, data: await f.arrayBuffer() } });
+    const data = await f.arrayBuffer();
+    app.set({ doc: { source: 'file', name: f.name, data } });
+    // keep a local copy so the file can be resumed after a restart
+    void storeFileDoc(`f-${f.name}-${data.byteLength}`, f.name, data);
   };
 
   if (!docRef) {
@@ -551,7 +612,7 @@ export function Reader() {
           <button className={`ibtn ${tool === 'clip' ? 'on' : ''}`} onClick={() => setTool(tool === 'clip' ? 'select' : 'clip')} title="Clip a figure or chart to the board (draw around it)">
             <Icon name="scissors" />
           </button>
-          <button className={`ibtn ${split ? 'on' : ''}`} onClick={() => app.set({ split: !split })} title="Split view: PDF + knowledge board">
+          <button className={`ibtn ${split ? 'on' : ''}`} onClick={() => setSide(split ? null : 'board')} title="Knowledge board beside the paper">
             <Icon name="split" />
           </button>
           <button className={`ibtn ${tool === 'pen' ? 'on' : ''}`} onClick={() => setTool(tool === 'pen' ? 'select' : 'pen')} title="Pen">
@@ -577,8 +638,8 @@ export function Reader() {
       </div>
 
       <div className="reader-body">
-        {!focus && !split && (
-          <aside className="reader-side">
+        {!focus && (
+          <aside className={`reader-side ${beside ? 'beside' : ''}`}>
             <h4>Bookmarks</h4>
             {notes.bookmarks.length === 0 && <p className="muted small">No bookmarks yet</p>}
             {notes.bookmarks.map(b => (
@@ -586,13 +647,14 @@ export function Reader() {
                 <Icon name="bookmark" size={16} /> Page {faNum.format(b)}
               </button>
             ))}
+            {docRef.source === 'marginal' && <RelatedList id={docRef.paper.id} onPick={p => openPaper(p)} />}
             <h4>Highlights</h4>
             {notes.highlights.length === 0 && <p className="muted small">Select text and press H, or drag over text with a pinch</p>}
             {notes.highlights
               .slice()
               .reverse()
               .map(h => (
-                <button key={h.id} className="side-row hl-row" onClick={() => goto(h.page)}>
+                <button key={h.id} className="side-row hl-row" onClick={() => goto(h.page)} {...carryProps(h.text ? { type: 'text', text: h.text, source: source(h.page) } : null)}>
                   <span className="hl-chip" style={{ background: h.color }} />
                   <span dir="auto" className="hl-text">
                     {h.text || '—'}
@@ -602,7 +664,18 @@ export function Reader() {
               ))}
           </aside>
         )}
-        <div className="pdf-scroll" ref={scroller}>
+        <div
+          className="pdf-scroll"
+          ref={scroller}
+          onDragStart={e => {
+            // dragging selected text carries a sourced quote onto the board beside the paper
+            const sel = getSelection();
+            const text = sel?.toString().trim();
+            const pg = Number((sel?.anchorNode?.parentElement?.closest('.pdf-page') as HTMLElement | null)?.dataset.page);
+            if (!text || !pg) return;
+            e.dataTransfer.setData(CLIP_MIME, JSON.stringify({ type: 'text', text, source: source(pg) }));
+          }}
+        >
           {error && <div className="card">Could not open the PDF: {error}</div>}
           {!pdf && !error && <div className="loading-leaf">Opening…</div>}
           {pdf &&
@@ -621,11 +694,6 @@ export function Reader() {
             ))}
           {selRect && (tool === 'highlight' || tool === 'clip') && <SelectionBox sel={selRect} />}
         </div>
-        {split && (
-          <aside className="reader-split">
-            <Board compact />
-          </aside>
-        )}
       </div>
       {lens && lensAt && <canvas ref={lensCanvas} width={260} height={260} className="lens" style={{ left: lensAt.x - 130, top: lensAt.y - 290 }} />}
     </div>

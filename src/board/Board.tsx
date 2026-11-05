@@ -1,16 +1,20 @@
 // Spatial Knowledge Board (SR-02/03): infinite canvas of clips, notes and video moments,
 // each card linked back to its exact source. Mouse, keyboard and hand gestures all work.
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { appData } from '../apps/data';
 import { openPaper, openVideo, toast } from '../state/app';
 import { Icon, type IconName } from '../ui/icons';
 import { useRadialItems, useVisionHandler } from '../vision/router';
-import { fitView, link, moveNode, removeNode, unlink, updateNode, type BoardNode } from './model';
+import { usePane } from '../state/pane';
+import { CLIP_MIME, dropClip, fitView, frameAround, inFrame, link, moveGroup, NOTE_COLORS, paperMap, parseClip, removeNode, setEdgeLabel, unlink, updateNode, type BoardNode, type Clip } from './model';
+import { BOARD_DROP, type BoardDropDetail } from './carry';
+import { currentRelations } from '../discovery/store';
+import { paperProgress } from '../garden/KnowledgeGarden';
 import { addNote, board, commit, history, live, redo, setView, undo } from './store';
 import { openAssistant } from '../ai/store';
 
-const TYPE_ICON: Record<BoardNode['type'], IconName> = { text: 'highlight', figure: 'lens', note: 'edit', video: 'youtube', ai: 'sparkle' };
-const TYPE_LABEL: Record<BoardNode['type'], string> = { text: 'Text clip', figure: 'Figure', note: 'Note', video: 'Video moment', ai: 'AI answer' };
+const TYPE_ICON: Record<BoardNode['type'], IconName> = { text: 'highlight', figure: 'lens', note: 'edit', video: 'youtube', ai: 'sparkle', frame: 'split', paper: 'book' };
+const TYPE_LABEL: Record<BoardNode['type'], string> = { text: 'Text clip', figure: 'Figure', note: 'Note', video: 'Video moment', ai: 'AI answer', frame: 'Frame', paper: 'Paper' };
 const fa = new Intl.NumberFormat('en-US');
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
@@ -23,13 +27,83 @@ function openSource(n: BoardNode) {
   toast('This clip comes from a local file; open the file in the reader again', 'warn');
 }
 
+function FrameCard({ n, selected }: { n: BoardNode; selected: boolean }) {
+  return (
+    <div className={`bframe ${selected ? 'sel' : ''}`} data-node={n.id} style={{ left: n.x, top: n.y, width: n.w, height: n.h ?? 320 }} onClick={() => board.set({ selected: n.id })}>
+      <div className="bframe-h" data-drag={n.id}>
+        <input
+          value={n.text}
+          dir="auto"
+          aria-label="Frame title"
+          onChange={e => live(updateNode(board.get().doc, n.id, { text: e.target.value }))}
+          onBlur={() => commit(history.present)}
+          onPointerDown={e => e.stopPropagation()}
+        />
+        {selected && (
+          <button className="ibtn tiny" onClick={e => (e.stopPropagation(), commit(removeNode(board.get().doc, n.id)), board.set({ selected: null }))} title="Delete the frame (keeps its cards)">
+            <Icon name="trash" size={14} />
+          </button>
+        )}
+      </div>
+      <span className="bframe-resize" data-resize={n.id} aria-label="Resize frame" />
+    </div>
+  );
+}
+
+function PaperCard({ n, selected, linking }: { n: BoardNode; selected: boolean; linking: string | null }) {
+  const paper = appData.use(s => s.papers.find(p => p.id === n.paperId));
+  const prog = paper ? paperProgress(paper) : 0;
+  return (
+    <div
+      className={`bcard bcard-paper ${selected ? 'sel' : ''} ${linking === n.id ? 'linking' : ''}`}
+      data-node={n.id}
+      style={{ left: n.x, top: n.y, width: n.w }}
+      onClick={() => {
+        const st = board.get();
+        if (st.linking && st.linking !== n.id) {
+          commit(link(st.doc, st.linking, n.id));
+          board.set({ linking: null });
+        } else board.set({ selected: n.id });
+      }}
+    >
+      <div className="bcard-h" data-drag={n.id}>
+        <Icon name="book" size={16} />
+        <span>Paper</span>
+        {paper && (
+          <button className="cite" onClick={e => (e.stopPropagation(), openPaper(paper))} title="Open the paper">
+            Open · {fa.format(Math.round(prog * 100))}%
+          </button>
+        )}
+      </div>
+      <p className="paper-node-title" dir="auto">
+        {n.text}
+      </p>
+      <div className="bar">
+        <span style={{ width: `${Math.round(prog * 100)}%` }} />
+      </div>
+      {selected && (
+        <div className="bcard-actions">
+          <button className="ibtn tiny" onClick={e => (e.stopPropagation(), board.set({ linking: n.id }))} title="Connect to another card">
+            <Icon name="leaf" size={14} />
+          </button>
+          <button className="ibtn tiny" onClick={e => (e.stopPropagation(), commit(removeNode(board.get().doc, n.id)), board.set({ selected: null }))} title="Remove from the map">
+            <Icon name="trash" size={14} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Card({ n, selected, linking }: { n: BoardNode; selected: boolean; linking: string | null }) {
   const s = n.source;
+  if (n.type === 'frame') return <FrameCard n={n} selected={selected} />;
+  if (n.type === 'paper') return <PaperCard n={n} selected={selected} linking={linking} />;
   return (
     <div
       className={`bcard bcard-${n.type} ${selected ? 'sel' : ''} ${linking === n.id ? 'linking' : ''}`}
       data-node={n.id}
-      style={{ left: n.x, top: n.y, width: n.w }}
+      style={{ left: n.x, top: n.y, width: n.w, ...(n.type === 'note' && n.color ? { ['--note' as string]: n.color } : {}) }}
       onPointerDown={e => {
         // only the header (not its buttons) starts a card drag on the host
         const t = e.target as Element;
@@ -75,6 +149,10 @@ function Card({ n, selected, linking }: { n: BoardNode; selected: boolean; linki
           <button className="ibtn tiny" onClick={e => (e.stopPropagation(), board.set({ linking: n.id }))} title="Connect to another card">
             <Icon name="leaf" size={14} />
           </button>
+          {n.type === 'note' &&
+            NOTE_COLORS.map(c => (
+              <button key={c} className={`swatch tiny ${n.color === c ? 'on' : ''}`} style={{ background: c }} onClick={e => (e.stopPropagation(), commit(updateNode(board.get().doc, n.id, { color: c })))} aria-label="Note colour" />
+            ))}
           {n.type !== 'ai' && (
             <button
               className="ibtn tiny"
@@ -104,7 +182,16 @@ function Card({ n, selected, linking }: { n: BoardNode; selected: boolean; linki
 export function Board({ compact = false }: { compact?: boolean }) {
   const { doc, view, linking, selected, canUndo, canRedo } = board.use(s => s);
   const host = useRef<HTMLDivElement>(null);
-  const drag = useRef<null | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number } | { kind: 'node'; id: string; sx: number; sy: number; nx: number; ny: number }>(null);
+  const { active } = usePane();
+  const activeRef = useRef(active);
+  activeRef.current = active;
+  const drag = useRef<
+    | null
+    | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
+    | { kind: 'node'; id: string; sx: number; sy: number; starts: Record<string, { x: number; y: number }> }
+    | { kind: 'resize'; id: string; sx: number; sy: number; w: number; h: number }
+  >(null);
+  const [edgeSel, setEdgeSel] = useState<string | null>(null);
 
   const local = (cx: number, cy: number) => {
     const r = host.current!.getBoundingClientRect();
@@ -121,30 +208,37 @@ export function Board({ compact = false }: { compact?: boolean }) {
 
   const begin = (cx: number, cy: number, target: Element | null) => {
     const id = target?.closest('[data-drag]')?.getAttribute('data-drag');
+    const rid = target?.closest('[data-resize]')?.getAttribute('data-resize');
     const v = board.get().view;
-    if (id) {
-      const n = board.get().doc.nodes.find(x => x.id === id)!;
-      drag.current = { kind: 'node', id, sx: cx, sy: cy, nx: n.x, ny: n.y };
+    const doc = board.get().doc;
+    if (rid) {
+      const f = doc.nodes.find(x => x.id === rid)!;
+      drag.current = { kind: 'resize', id: rid, sx: cx, sy: cy, w: f.w, h: f.h ?? 320 };
+    } else if (id) {
+      // a frame carries the cards inside it (tldraw-style)
+      const ids = [id, ...inFrame(doc, id)];
+      const starts = Object.fromEntries(ids.map(i => { const n = doc.nodes.find(x => x.id === i)!; return [i, { x: n.x, y: n.y }]; }));
+      drag.current = { kind: 'node', id, sx: cx, sy: cy, starts };
       board.set({ selected: id });
-    } else if (!target?.closest('.bcard, .board-tools')) drag.current = { kind: 'pan', sx: cx, sy: cy, vx: v.x, vy: v.y };
+    } else if (!target?.closest('.bcard, .bframe-h, .board-tools, .edge, .edge-editor')) drag.current = { kind: 'pan', sx: cx, sy: cy, vx: v.x, vy: v.y };
     return !!drag.current;
   };
   const move = (cx: number, cy: number) => {
     const d = drag.current;
     if (!d) return;
+    const k = board.get().view.scale;
     if (d.kind === 'pan') setView({ ...board.get().view, x: d.vx + cx - d.sx, y: d.vy + cy - d.sy });
-    else {
-      const s = board.get().view.scale;
-      live(moveNode(board.get().doc, d.id, d.nx + (cx - d.sx) / s, d.ny + (cy - d.sy) / s));
-    }
+    else if (d.kind === 'resize') live(updateNode(board.get().doc, d.id, { w: Math.max(200, d.w + (cx - d.sx) / k), h: Math.max(140, d.h + (cy - d.sy) / k) }));
+    else live(moveGroup(board.get().doc, d.starts, (cx - d.sx) / k, (cy - d.sy) / k));
   };
   const end = () => {
-    if (drag.current?.kind === 'node') commit(history.present);
+    if (drag.current?.kind === 'node' || drag.current?.kind === 'resize') commit(history.present);
     drag.current = null;
   };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (!activeRef.current) return;
       if (e.target instanceof Element && e.target.closest('input, textarea')) return;
       if (e.ctrlKey && e.key.toLowerCase() === 'z') (e.preventDefault(), undo());
       else if (e.ctrlKey && e.key.toLowerCase() === 'y') (e.preventDefault(), redo());
@@ -156,6 +250,61 @@ export function Board({ compact = false }: { compact?: boolean }) {
     addEventListener('keydown', onKey);
     return () => removeEventListener('keydown', onKey);
   }, []);
+
+  // dropping content on the board: clips carried from the reader, the AI panel or a video
+  // (mouse drag-and-drop or hand pinch-carry), plain text, or an image file
+  const toWorld = (cx: number, cy: number) => {
+    const p = local(cx, cy), v = board.get().view;
+    return { x: (p.x - v.x) / v.scale, y: (p.y - v.y) / v.scale };
+  };
+  const place = (clip: Clip, cx: number, cy: number) => {
+    const next = dropClip(board.get().doc, clip, toWorld(cx, cy));
+    commit(next);
+    board.set({ selected: next.nodes[next.nodes.length - 1].id });
+    toast('Added to the knowledge board', 'ok');
+  };
+  useEffect(() => {
+    const on = (e: Event) => {
+      const { clip, x, y } = (e as CustomEvent<BoardDropDetail>).detail;
+      const r = host.current?.getBoundingClientRect();
+      if (r && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) place(clip, x, y);
+    };
+    addEventListener(BOARD_DROP, on);
+    return () => removeEventListener(BOARD_DROP, on);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    host.current?.classList.remove('drop-over');
+    const clip = parseClip(e.dataTransfer.getData(CLIP_MIME));
+    if (clip) return place(clip, e.clientX, e.clientY);
+    const file = [...e.dataTransfer.files].find(f => f.type.startsWith('image/') && f.size < 4e6);
+    if (file) {
+      const { clientX, clientY } = e;
+      const fr = new FileReader();
+      fr.onload = () => place({ type: 'figure', text: file.name, image: String(fr.result), source: null }, clientX, clientY);
+      return fr.readAsDataURL(file);
+    }
+    const text = e.dataTransfer.getData('text/plain').trim();
+    if (text) place({ type: 'note', text: text.slice(0, 4000), source: null }, e.clientX, e.clientY);
+  };
+
+  const addFrame = () => {
+    const st = board.get();
+    const r = host.current?.getBoundingClientRect();
+    const at = r ? toWorld(r.left + r.width / 2 - 200, r.top + r.height / 2 - 150) : { x: 0, y: 0 };
+    commit(frameAround(st.doc, st.selected && st.doc.nodes.find(n => n.id === st.selected)?.type !== 'frame' ? [st.selected] : [], at));
+  };
+  const mapPapers = () => {
+    const papers = appData.get().papers.map(p => ({ id: p.id, title: p.title }));
+    const related = currentRelations().map(r => [r.a, r.b, r.terms.slice(0, 2).join(', ')] as [string, string, string]);
+    const before = board.get().doc;
+    const next = paperMap(before, papers, related);
+    if (next === before) return toast('Clip something from a paper first; the map gathers clips around their papers', 'info');
+    commit(next);
+    if (host.current) setView(fitView(next, host.current.clientWidth, host.current.clientHeight));
+    toast('Paper map updated: clips are linked to their papers, related papers to each other', 'ok');
+  };
 
   // hand: pinch-drag a card header to move it, pinch-drag empty space to pan, two hands to zoom
   useVisionHandler(
@@ -203,6 +352,13 @@ export function Board({ compact = false }: { compact?: boolean }) {
         onPointerMove={e => move(e.clientX, e.clientY)}
         onPointerUp={end}
         onWheel={e => zoomAt(e.deltaY < 0 ? 1.1 : 1 / 1.1, e.clientX, e.clientY)}
+        onDragOver={e => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+          host.current?.classList.add('drop-over');
+        }}
+        onDragLeave={e => e.currentTarget === e.target && host.current?.classList.remove('drop-over')}
+        onDrop={onDrop}
         onDoubleClick={e => {
           if ((e.target as Element).closest('.bcard')) return;
           const p = local(e.clientX, e.clientY);
@@ -211,6 +367,12 @@ export function Board({ compact = false }: { compact?: boolean }) {
       >
         <div className="board-grid" style={{ backgroundPosition: `${view.x}px ${view.y}px`, backgroundSize: `${40 * view.scale}px ${40 * view.scale}px` }} />
         <div className="board-world" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})` }}>
+          {/* frames sit underneath the links and the cards they hold */}
+          {doc.nodes
+            .filter(n => n.type === 'frame')
+            .map(n => (
+              <Card key={n.id} n={n} selected={selected === n.id} linking={linking} />
+            ))}
           <svg className="board-edges" width="1" height="1">
             {doc.edges.map(ed => {
               const a = byId.get(ed.from), b = byId.get(ed.to);
@@ -218,22 +380,48 @@ export function Board({ compact = false }: { compact?: boolean }) {
               const ax = a.x + a.w / 2, ay = a.y + 60, bx = b.x + b.w / 2, by = b.y + 60;
               const mx = (ax + bx) / 2;
               return (
-                <g key={ed.id} className="edge" onClick={() => commit(unlink(board.get().doc, ed.id))}>
+                <g key={ed.id} className={`edge ${edgeSel === ed.id ? 'sel' : ''}`} onClick={() => setEdgeSel(edgeSel === ed.id ? null : ed.id)}>
                   <path d={`M${ax},${ay} C${mx},${ay} ${mx},${by} ${bx},${by}`} />
                   <circle cx={(ax + bx) / 2} cy={(ay + by) / 2} r={5} />
+                  {ed.label && edgeSel !== ed.id && (
+                    <text x={(ax + bx) / 2} y={(ay + by) / 2 - 10} textAnchor="middle" className="edge-label">
+                      {ed.label}
+                    </text>
+                  )}
+                  {edgeSel === ed.id && (
+                    <foreignObject x={(ax + bx) / 2 - 110} y={(ay + by) / 2 - 52} width={220} height={40}>
+                      <div className="edge-editor" onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}>
+                        <input
+                          autoFocus
+                          defaultValue={ed.label ?? ''}
+                          placeholder="Label (supports, contradicts…)"
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') (commit(setEdgeLabel(board.get().doc, ed.id, e.currentTarget.value)), setEdgeSel(null));
+                            if (e.key === 'Escape') setEdgeSel(null);
+                          }}
+                          onBlur={e => commit(setEdgeLabel(board.get().doc, ed.id, e.currentTarget.value))}
+                        />
+                        <button className="ibtn tiny" onClick={() => (commit(unlink(board.get().doc, ed.id)), setEdgeSel(null))} title="Remove the link" aria-label="Remove the link">
+                          <Icon name="trash" size={13} />
+                        </button>
+                      </div>
+                    </foreignObject>
+                  )}
                 </g>
               );
             })}
           </svg>
-          {doc.nodes.map(n => (
-            <Card key={n.id} n={n} selected={selected === n.id} linking={linking} />
-          ))}
+          {doc.nodes
+            .filter(n => n.type !== 'frame')
+            .map(n => (
+              <Card key={n.id} n={n} selected={selected === n.id} linking={linking} />
+            ))}
         </div>
         {doc.nodes.length === 0 && (
           <div className="board-empty">
             <Icon name="leaf" size={34} />
             <p>The knowledge board is empty.</p>
-            <p className="muted small">In the reader, select text and press “Clip to board”, or draw around a chart with the “Clip figure” tool. In YouTube you can also send any bookmark to the board. Double-click for a new note.</p>
+            <p className="muted small">Drag a highlight, a selection, an AI answer or an image onto this board (or pinch-carry it with your hand). In the reader you can also select text and press “Clip to board”, or draw around a chart with the “Clip figure” tool. In YouTube you can also send any bookmark to the board. Double-click for a new note.</p>
           </div>
         )}
       </div>
@@ -250,6 +438,12 @@ export function Board({ compact = false }: { compact?: boolean }) {
         </button>
         <button className="ibtn" onClick={() => host.current && setView(fitView(doc, host.current.clientWidth, host.current.clientHeight))} title="Fit all">
           <Icon name="expand" />
+        </button>
+        <button className="ibtn" onClick={addFrame} title="Frame: group the selected card (or start an empty frame)">
+          <Icon name="split" />
+        </button>
+        <button className="ibtn" onClick={mapPapers} title="Paper map: link clips to their papers and related papers to each other">
+          <Icon name="network" />
         </button>
         <button className="ibtn" onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)">
           <Icon name="undo" />

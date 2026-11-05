@@ -3,6 +3,9 @@
 import { useRef } from 'react';
 import { appData } from '../apps/data';
 import { app, go } from '../state/app';
+import { workspace } from '../state/workspace';
+import { useRelations } from '../discovery/store';
+import { GrowthFx } from './Journey';
 import { useVisionHandler } from '../vision/router';
 import { commitMove, garden, isThirsty, moveDecorLive, placeAtGhost, updateGhost } from './gardenState';
 import { DecorLayer, KnowledgeGarden } from './KnowledgeGarden';
@@ -20,6 +23,9 @@ export function GardenLayers() {
   const papers = appData.use(s => s.papers);
   const showProgress = app.use(s => s.gardenProgress);
   const preset = app.use(s => s.preset);
+  const last = workspace.use(s => s.recent[0]);
+  const active = last?.kind === 'paper' ? { id: last.id, page: last.page } : null;
+  const relations = useRelations();
   const { decor, editing, selected, placing, ghost, careSim } = garden.use(s => s);
   // over the photograph the decorative layer would duplicate real objects; it returns in the studio
   const photo = preset === 'photo' && !editing;
@@ -116,6 +122,7 @@ export function GardenLayers() {
         onInspect={id => garden.set({ inspect: id, picked: null })}
       />
       )}
+      {!editing && <GrowthFx photo={photo} />}
       {!editing && (
         <KnowledgeGarden
           papers={papers}
@@ -124,6 +131,9 @@ export function GardenLayers() {
           onHover={(paper, el) => garden.set({ hover: paper && el ? { paper, rect: el.getBoundingClientRect() } : null })}
           onLibrary={() => go('library')}
           photo={photo}
+          active={active}
+          relations={relations}
+          onThread={r => garden.set({ thread: { a: r.a, b: r.b, terms: r.terms }, picked: null, inspect: null })}
         />
       )}
     </>

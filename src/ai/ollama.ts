@@ -93,6 +93,21 @@ export const ollama = {
     return full;
   },
 
+  /** Embedding vectors for related-paper discovery (any embedding model, e.g. nomic-embed-text). */
+  async embed(model: string, input: string[], signal?: AbortSignal): Promise<number[][]> {
+    let out: number[][] = [];
+    await streamJson(
+      '/api/embed',
+      { model, input },
+      obj => {
+        if (obj.error) throw new Error(String(obj.error));
+        if (Array.isArray(obj.embeddings)) out = obj.embeddings as number[][];
+      },
+      signal,
+    );
+    return out;
+  },
+
   /** Downloads a model (user-initiated). Progress 0..1 when sizes are known. */
   async pull(model: string, onProgress: (status: string, frac: number | null) => void, signal?: AbortSignal) {
     await streamJson(

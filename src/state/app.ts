@@ -33,7 +33,7 @@ interface Prefs {
 export type Preset = 'photo' | 'morning' | 'rainy' | 'sunset' | 'night';
 
 const PREFS_KEY = 'vos.prefs';
-const prefs = loadJson<Prefs>(PREFS_KEY, { theme: 'day', workspace: 'research', reducedMotion: false, gardenProgress: true, wallpaper: null, preset: 'photo', companion: false, userName: '' });
+const prefs = loadJson<Prefs>(PREFS_KEY, { theme: 'night', workspace: 'research', reducedMotion: false, gardenProgress: true, wallpaper: null, preset: 'photo', companion: true, userName: '' });
 
 export const app = createStore({
   screen: 'home' as Screen,
@@ -44,7 +44,6 @@ export const app = createStore({
   /** page to jump to when the reader next opens a document (from a board card or the garden) */
   pendingPage: null as number | null,
   pendingVideo: null as { id: string; t: number } | null,
-  split: false,
   plannerTab: 'schedule' as PlannerTab,
   libraryTab: 'papers' as LibraryTab,
   ...prefs,
@@ -72,7 +71,10 @@ export function go(screen: Screen) {
 }
 
 export function openPaper(paper: MarginalPaper, page?: number) {
-  app.set({ doc: { source: 'marginal', paper }, screen: 'reader', pendingPage: page ?? null });
+  // the reader stays open in the background: reopening the same paper only jumps to the page
+  const cur = app.get().doc;
+  const doc = cur?.source === 'marginal' && cur.paper.id === paper.id ? cur : { source: 'marginal' as const, paper };
+  app.set({ doc, screen: 'reader', pendingPage: page ?? null, focus: false });
 }
 
 export function openVideo(id: string, t = 0) {

@@ -1,44 +1,53 @@
 import { useEffect, useState } from 'react';
+import { MotionConfig } from 'motion/react';
 import { lock, lockNow } from './lock/lock';
-import { focus } from './focus/store';
+import { current, focus } from './focus/store';
 import { LockScreen } from './lock/LockScreen';
 import { refreshAppData } from './apps/data';
-import { Cinema } from './cinema/Cinema';
 import { GardenLayers } from './garden/GardenLayers';
 import { GardenScene } from './garden/GardenScene';
 import { Home } from './home/Home';
 import { platform } from './platform';
-import { Reader } from './reader/Reader';
 import { BranchDock, FullscreenPod, SettingsPod } from './shell/BranchDock';
 import { TitleBar } from './shell/TitleBar';
 import { Library } from './screens/Library';
 import { Planner } from './screens/Planner';
 import { Settings, Toasts } from './shell/Shell';
 import { Launcher } from './shell/Launcher';
+import { Workspace } from './shell/Workspace';
+import { CarryLayer } from './board/carry';
+import { watchNewPapers } from './discovery/store';
+import { watchSessions } from './focus/summary';
+import { watchStudy } from './study/recorder';
+import { SessionSummaryCard } from './focus/SessionSummary';
 import { AiPanel } from './ai/AiPanel';
 import { Companion } from './shell/Companion';
-import { Board } from './board/Board';
 import { FocusOverlay, FocusStudio } from './focus/FocusUI';
 import { cancelPlacing, garden } from './garden/gardenState';
 import { app, go, setPrefs } from './state/app';
+import { APPS } from './apps/registry';
+import { daypart } from './state/workspace';
+import { sceneMode, weatherMood } from './state/ambience';
+import { isPane } from './state/layout';
+import { weather } from './apps/weather';
 import { Calibration } from './vision/Calibration';
 import { vision, visionStatus } from './vision/engine';
 import { setGlobalRadialItems } from './vision/router';
 import { HandCursor, RadialMenu, VisionHUD } from './vision/VisionUI';
+import { GestureTutorial } from './vision/GestureTutorial';
 import { runText } from './voice/run';
 import { listen, voiceState } from './voice/voice';
 
 setGlobalRadialItems([
-  { id: 'home', label: 'Garden', icon: 'garden', run: () => go('home') },
-  { id: 'reader', label: 'Read', icon: 'book', run: () => go('reader') },
-  { id: 'cinema', label: 'YouTube', icon: 'youtube', run: () => go('cinema') },
-  { id: 'board', label: 'Knowledge board', icon: 'board', run: () => go('board') },
+  ...APPS.filter(a => a.radial).map(a => ({ id: a.id, label: a.label, icon: a.icon, run: () => go(a.screen) })),
   { id: 'timer', label: 'Timer', icon: 'timer', run: () => focus.set(s => ({ overlayHidden: !s.overlayHidden })) },
 ]);
 
 export function App() {
   const locked = lock.use(s => s.locked);
-  return locked ? <LockScreen /> : <Desktop />;
+  const reduced = app.use(s => s.reducedMotion);
+  // Motion follows the app's reduced-motion setting as well as the system one
+  return <MotionConfig reducedMotion={reduced ? 'always' : 'user'}>{locked ? <LockScreen /> : <Desktop />}</MotionConfig>;
 }
 
 function Desktop() {
@@ -61,6 +70,65 @@ function Desktop() {
     document.documentElement.dataset.preset = preset;
     document.documentElement.dataset.motion = reduced ? 'reduced' : 'full';
   }, [theme, reduced, preset]);
+
+  // Reactive environment: the scene follows the time of day, quiets down while a focus session
+  // runs, and blooms briefly when one is completed. CSS reads these attributes (redesign.css).
+  focus.use(s => s.sessions);
+  const focusing = current()?.status === 'running';
+  const reward = focus.use(s => s.lastReward);
+  useEffect(() => {
+    const set = () => (document.documentElement.dataset.daypart = daypart(new Date().getHours()));
+    set();
+    const t = setInterval(set, 60000);
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    document.documentElement.dataset.activity = focusing ? 'focus' : screen === 'reader' || screen === 'board' || screen === 'cinema' ? 'work' : 'idle';
+  }, [focusing, screen]);
+  useEffect(() => {
+    if (!reward) return;
+    document.documentElement.dataset.bloom = '1';
+    const t = setTimeout(() => delete document.documentElement.dataset.bloom, 2600);
+    return () => clearTimeout(t);
+  }, [reward]);
+  // Lively-style considerate scene: follow the real weather, pause motion when the garden is
+  // hidden, covered by a work screen or running on a low battery
+  const weatherCode = weather.use(s => s.weather?.code);
+  const [hidden, setHidden] = useState(document.hidden);
+  const [battery, setBattery] = useState<{ level: number; charging: boolean } | null>(null);
+  useEffect(() => {
+    const on = () => setHidden(document.hidden);
+    document.addEventListener('visibilitychange', on);
+    type Battery = EventTarget & { level: number; charging: boolean };
+    let bat: Battery | null = null;
+    const read = () => bat && setBattery({ level: bat.level, charging: bat.charging });
+    void (navigator as Navigator & { getBattery?: () => Promise<Battery> }).getBattery?.().then(b => {
+      bat = b;
+      read();
+      b.addEventListener('levelchange', read);
+      b.addEventListener('chargingchange', read);
+    });
+    return () => {
+      document.removeEventListener('visibilitychange', on);
+      bat?.removeEventListener('levelchange', read);
+      bat?.removeEventListener('chargingchange', read);
+    };
+  }, []);
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.weather = weatherMood(weatherCode);
+    root.dataset.scene = sceneMode({ hidden, covered: isPane(screen) && !focusing, battery, reducedMotion: reduced });
+  }, [weatherCode, hidden, battery, screen, focusing, reduced]);
+
+  // a screen grows out of the dock button that opened it; other navigation uses the default
+  useEffect(() => {
+    const t = setTimeout(() => document.documentElement.style.removeProperty('--enter-origin'), 450);
+    return () => clearTimeout(t);
+  }, [screen]);
+
+  useEffect(() => watchNewPapers(), []);
+  useEffect(() => watchSessions(), []);
+  useEffect(() => watchStudy(), []);
 
   useEffect(() => {
     void refreshAppData();
@@ -119,29 +187,32 @@ function Desktop() {
           {screen === 'home' && <GardenLayers />}
         </GardenScene>
       )}
-      {preset === 'rainy' && <div className="rain" aria-hidden />}
+      {preset === 'rainy' ? <div className="rain" aria-hidden /> : <div className="rain weather-rain" aria-hidden />}
       {photoScene && screen === 'home' && <div className="scene-vignette" aria-hidden />}
+      <div className="scene-tint" aria-hidden />
+      <div className="scene-bloom" aria-hidden />
       <main className="stage">
         {screen === 'home' && <Home />}
-        {screen === 'reader' && <Reader />}
-        {screen === 'cinema' && <Cinema />}
         {screen === 'calibrate' && <Calibration />}
         {screen === 'settings' && <Settings />}
         {screen === 'focus' && <FocusStudio />}
-        {screen === 'board' && <Board />}
         {screen === 'library' && <Library />}
         {screen === 'planner' && <Planner />}
       </main>
+      <Workspace />
       {!focusMode && <BranchDock />}
       {!focusMode && <FullscreenPod />}
       {!focusMode && <SettingsPod />}
       <Companion />
       <FocusOverlay />
+      <SessionSummaryCard />
       <VisionHUD />
       <RadialMenu />
       <AiPanel />
       <Launcher />
       <Toasts />
+      <GestureTutorial />
+      <CarryLayer />
       <HandCursor />
     </div>
   );

@@ -1,7 +1,11 @@
 // Ambient sounds (FG-06) synthesised with WebAudio: no recordings, nothing to license, offline.
-import { useState } from 'react';
+import { createStore } from '../lib/store';
 
-type Kind = 'rain' | 'wind' | 'stream' | 'birds';
+export type Kind = 'rain' | 'wind' | 'stream' | 'birds';
+export type Levels = Record<Kind, number>;
+const SILENT: Levels = { rain: 0, wind: 0, stream: 0, birds: 0 };
+/** current mix; starts silent on every launch (audio only plays after the user asks for it) */
+export const ambience = createStore({ levels: { ...SILENT } });
 const LABEL: Record<Kind, string> = { rain: 'Rain', wind: 'Wind', stream: 'Stream', birds: 'Birds' };
 
 let ctx: AudioContext | null = null;
@@ -70,7 +74,14 @@ function build(kind: Kind, c: AudioContext): { gain: GainNode; stop: () => void 
   return { gain, stop: () => src.stop() };
 }
 
+/** Apply a whole mix at once (a saved research space restores its soundscape on request). */
+export function setAmbience(levels: Partial<Levels> | null) {
+  const next = { ...SILENT, ...(levels ?? {}) };
+  (Object.keys(SILENT) as Kind[]).forEach(k => setLevel(k, next[k]));
+}
+
 function setLevel(kind: Kind, level: number) {
+  ambience.set(s => ({ levels: { ...s.levels, [kind]: level } }));
   if (level > 0 && !ctx) ctx = new AudioContext();
   if (!ctx) return;
   void ctx.resume();
@@ -91,8 +102,7 @@ function setLevel(kind: Kind, level: number) {
 }
 
 export function AmbientMixer() {
-  // sounds start muted on every launch: audio only plays after the user asks for it
-  const [levels, setLevels] = useState<Record<Kind, number>>({ rain: 0, wind: 0, stream: 0, birds: 0 });
+  const levels = ambience.use(s => s.levels);
   return (
     <div className="ambient">
       {(Object.keys(LABEL) as Kind[]).map(k => (
@@ -105,9 +115,7 @@ export function AmbientMixer() {
             step={0.05}
             value={levels[k]}
             onChange={e => {
-              const v = Number(e.target.value);
-              setLevels(l => ({ ...l, [k]: v }));
-              setLevel(k, v);
+              setLevel(k, Number(e.target.value));
             }}
           />
         </label>
@@ -115,8 +123,7 @@ export function AmbientMixer() {
       <button
         className="btn small"
         onClick={() => {
-          (Object.keys(LABEL) as Kind[]).forEach(k => setLevel(k, 0));
-          setLevels({ rain: 0, wind: 0, stream: 0, birds: 0 });
+          setAmbience(null);
         }}
       >
         Mute

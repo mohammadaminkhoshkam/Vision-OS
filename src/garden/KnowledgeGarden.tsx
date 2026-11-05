@@ -5,6 +5,7 @@ import type { MarginalPaper } from '../platform';
 import { Decor, type DecorKind } from './plants';
 import type { DecorItem } from './gardenState';
 import { fromPhoto } from './GardenScene';
+import type { Relation } from '../discovery/related';
 
 const PALETTE = ['#b8423a', '#efe6d2', '#d9a441', '#8a2a3a', '#c86a3a', '#e8d6a8'];
 
@@ -87,6 +88,9 @@ export function KnowledgeGarden({
   onHover,
   onLibrary,
   photo,
+  active,
+  relations,
+  onThread,
 }: {
   papers: MarginalPaper[];
   showProgress: boolean;
@@ -95,9 +99,14 @@ export function KnowledgeGarden({
   onLibrary: () => void;
   /** photographic background: the planter is in the photo, papers become glowing seed lights */
   photo?: boolean;
+  /** the paper in the current session: lit up and labelled so the garden mirrors the work */
+  active?: { id: string; page?: number } | null;
+  /** research connections between papers, drawn as threads of light */
+  relations?: Relation[];
+  onThread?: (r: Relation) => void;
 }) {
-  if (photo) return <PhotoGarden papers={papers} showProgress={showProgress} onOpen={onOpen} onHover={onHover} onLibrary={onLibrary} />;
-  return <PaintedGarden papers={papers} showProgress={showProgress} onOpen={onOpen} onHover={onHover} onLibrary={onLibrary} />;
+  const props = { papers, showProgress, onOpen, onHover, onLibrary, activeId: active?.id, activePage: active?.page, relations, onThread };
+  return photo ? <PhotoGarden {...props} /> : <PaintedGarden {...props} />;
 }
 
 type GardenProps = {
@@ -106,12 +115,45 @@ type GardenProps = {
   onOpen: (p: MarginalPaper) => void;
   onHover: (p: MarginalPaper | null, el: Element | null) => void;
   onLibrary: () => void;
+  activeId?: string | null;
+  /** page from the live session, fresher than Marginal's record */
+  activePage?: number;
+  relations?: Relation[];
+  onThread?: (r: Relation) => void;
 };
 
-/** Over the photo: each paper is a small glowing seed light floating above the planter's plants;
- *  brighter and larger as the paper is read. */
-function PhotoGarden({ papers, showProgress, onOpen, onHover, onLibrary }: GardenProps) {
-  const list = papers.slice(0, 12);
+/** Threads of light between related papers (Reor-style discovery made visible). A thread through
+ *  the paper you are working on glows brighter; choosing one shows both papers and why. */
+function Threads({ pos, relations, activeId, onThread }: { pos: Map<string, { x: number; y: number }>; relations?: Relation[]; activeId?: string | null; onThread?: (r: Relation) => void }) {
+  if (!relations?.length) return null;
+  return (
+    <g className="threads">
+      {relations.map(r => {
+        const a = pos.get(r.a), b = pos.get(r.b);
+        if (!a || !b) return null;
+        const mx = (a.x + b.x) / 2, my = Math.min(a.y, b.y) - 40 - Math.abs(a.x - b.x) * 0.12;
+        const hot = r.a === activeId || r.b === activeId;
+        const d = `M${a.x},${a.y} Q${mx},${my} ${b.x},${b.y}`;
+        return (
+          <g key={`${r.a}-${r.b}`} className={`thread ${hot ? 'hot' : ''}`} role="button" data-vt aria-label={`Connection: ${r.terms.join(', ')}`} onClick={() => onThread?.(r)}>
+            <path d={d} className="thread-glow" style={{ strokeWidth: 2 + r.score * 6 }} />
+            <path d={d} className="thread-line" />
+            <path d={d} className="thread-hit" />
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+/** Over the photo: each paper is a glowing seed light floating above the planter's plants,
+ *  brighter as it is read; a finished paper opens into a small bloom. The paper in the current
+ *  session is ringed and labelled with its page, so the scene reflects what you are working on. */
+function PhotoGarden({ papers, showProgress, onOpen, onHover, onLibrary, activeId, activePage, relations, onThread }: GardenProps) {
+  // the active paper always gets a place, the middle one, where its label stays clear of the panels
+  const active = activeId ? papers.find(p => p.id === activeId) : undefined;
+  const rest = papers.filter(p => p !== active).slice(0, active ? 11 : 12);
+  const list = active ? [...rest.slice(0, Math.floor(rest.length / 2)), active, ...rest.slice(Math.floor(rest.length / 2))] : rest;
   const a = fromPhoto(560, 0).x, b = fromPhoto(1090, 0).x;
   return (
     <g className="kgarden photo">
@@ -129,15 +171,49 @@ function PhotoGarden({ papers, showProgress, onOpen, onHover, onLibrary }: Garde
           <feDropShadow dx="0" dy="6" stdDeviation="6" floodColor="#000" floodOpacity="0.55" />
         </filter>
       </defs>
+      <Threads pos={new Map(list.map((p, i) => [p.id, { x: a + ((b - a) * (i + 0.5)) / list.length, y: fromPhoto(0, 520 - ((i * 53) % 70)).y }]))} relations={relations} activeId={activeId} onThread={onThread} />
       {list.map((p, i) => {
         const prog = showProgress ? paperProgress(p) : 1;
         const x = a + ((b - a) * (i + 0.5)) / list.length;
         const y = fromPhoto(0, 520 - ((i * 53) % 70)).y;
-        const r = 9 + prog * 9;
+        const on = p.id === activeId;
+        const r = (9 + prog * 9) * (on ? 1.25 : 1);
+        const bloom = showProgress && prog >= 0.9;
+        const page = (on && activePage) || p.lastPage || p.maxPage;
         return (
-          <g key={p.id} className="kflower seed" data-vt role="button" aria-label={p.title} onClick={() => onOpen(p)} onMouseEnter={e => onHover(p, e.currentTarget)} onMouseLeave={() => onHover(null, null)} style={{ animationDelay: `-${i * 0.9}s` }}>
+          <g
+            key={p.id}
+            className={`kflower seed ${on ? 'active' : ''} ${bloom ? 'bloomed' : ''}`}
+            data-vt
+            role="button"
+            aria-label={p.title}
+            onClick={() => onOpen(p)}
+            onMouseEnter={e => onHover(p, e.currentTarget)}
+            onMouseLeave={() => onHover(null, null)}
+            style={{ animationDelay: `-${i * 0.9}s` }}
+          >
             <circle cx={x} cy={y} r={r * 3.2} fill="url(#seedGlow)" opacity={0.55 + prog * 0.35} />
-            <circle cx={x} cy={y} r={r * 0.42} fill="#fff6d6" />
+            {bloom ? (
+              <g transform={`translate(${x} ${y}) scale(0.62)`}>
+                <Bloom p={1} color={p.favorite ? '#fffaf0' : '#f2c9a0'} favorite={p.favorite} />
+              </g>
+            ) : (
+              <circle cx={x} cy={y} r={r * 0.42} fill="#fff6d6" />
+            )}
+            {on && (
+              <>
+                <circle className="seed-ring" cx={x} cy={y} r={r * 1.6} fill="none" stroke="#f1cd84" strokeWidth={1.5} />
+                <g className="seed-tag" transform={`translate(${x} ${y - r * 2.4})`} pointerEvents="none">
+                  <rect x={-92} y={-30} width={184} height={34} rx={8} fill="rgba(8,20,15,0.86)" stroke="rgba(241,205,132,0.55)" />
+                  <text y={-16} textAnchor="middle" fontSize={12} fontWeight={600} fill="#f5f0e5" fontFamily="var(--font)">
+                    {p.title.length > 28 ? p.title.slice(0, 27) + '…' : p.title}
+                  </text>
+                  <text y={-2} textAnchor="middle" fontSize={10.5} fill="#f1cd84" fontFamily="var(--font)">
+                    {page ? `page ${page}${p.pages ? ` of ${p.pages}` : ''}` : 'in progress'}
+                  </text>
+                </g>
+              </>
+            )}
             <circle cx={x} cy={y} r={30} fill="transparent" />
           </g>
         );
@@ -147,7 +223,7 @@ function PhotoGarden({ papers, showProgress, onOpen, onHover, onLibrary }: Garde
   );
 }
 
-function PaintedGarden({ papers, showProgress, onOpen, onHover, onLibrary }: GardenProps) {
+function PaintedGarden({ papers, showProgress, onOpen, onHover, onLibrary, activeId, relations, onThread }: GardenProps) {
   const beds = useMemo(() => {
     const groups = new Map<string, MarginalPaper[]>();
     for (const p of papers) {
@@ -192,16 +268,18 @@ function PaintedGarden({ papers, showProgress, onOpen, onHover, onLibrary }: Gar
       <ellipse cx={(x0 + x1) / 2} cy={bottom + 18} rx={(x1 - x0) / 2 + 120} ry={46} fill="url(#planterGlow)" />
       <ellipse cx={(x0 + x1) / 2} cy={top - 40} rx={(x1 - x0) / 2} ry={90} fill="url(#planterGlow)" opacity={0.55} style={{ mixBlendMode: 'screen' }} />
       <PlanterLeaves />
+      <Threads pos={new Map(slots.map(({ p, x }, i) => [p.id, { x, y: top - (70 + ((i * 37) % 44)) }]))} relations={relations} activeId={activeId} onThread={onThread} />
       {slots.map(({ p, bi, x }, i) => {
         const h = 70 + ((i * 37) % 44);
         const prog = showProgress ? paperProgress(p) : 1;
         const color = PALETTE[bi % PALETTE.length];
         return (
-          <g key={p.id} className="kflower" data-vt role="button" aria-label={p.title} onClick={() => onOpen(p)} onMouseEnter={e => onHover(p, e.currentTarget)} onMouseLeave={() => onHover(null, null)}>
+          <g key={p.id} className={`kflower ${p.id === activeId ? 'active' : ''}`} data-vt role="button" aria-label={p.title} onClick={() => onOpen(p)} onMouseEnter={e => onHover(p, e.currentTarget)} onMouseLeave={() => onHover(null, null)}>
             <path d={`M${x},${top} Q${x + (i % 2 ? 8 : -8)},${top - h / 2} ${x},${top - h}`} stroke="#3a6b35" strokeWidth={3.5} fill="none" />
             <path d={`M${x},${top - 24} q${i % 2 ? 16 : -16},-6 ${i % 2 ? 20 : -20},-20 q${i % 2 ? -12 : 12},2 ${i % 2 ? -20 : 20},20z`} fill="#3f7038" />
             <g transform={`translate(${x},${top - h})`}>
               <circle r={30} fill="transparent" />
+              {p.id === activeId && <circle className="seed-ring" r={34} fill="none" stroke="#f1cd84" strokeWidth={2} />}
               <Bloom p={prog} color={p.favorite ? '#fffaf0' : color} favorite={p.favorite} />
             </g>
           </g>

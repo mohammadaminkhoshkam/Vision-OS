@@ -83,31 +83,62 @@ export function VisionHUD() {
   );
 }
 
+/** What the cursor tells you about the gesture being read: a ring that fills while a pinch is
+ *  held (release before it closes = click, keep holding = drag) and a short confirmation chip for
+ *  every recognised command. */
+const CONFIRM: Partial<Record<string, string>> = { CLICK: 'Click', DOUBLE_CLICK: 'Double click', DRAG_START: 'Drag', MENU_OPEN: 'Menu' };
+
 export function HandCursor() {
   const el = useRef<HTMLDivElement>(null);
   const [cls, setCls] = useState('');
+  const [chip, setChip] = useState<{ text: string; n: number } | null>(null);
   const state = visionStatus.use(s => s.state);
-  useEffect(
-    () =>
-      vision.on(e => {
-        const c = el.current;
-        if (!c) return;
-        if (e.type === 'POINTER_MOVE') c.style.transform = `translate(${e.x * innerWidth}px, ${e.y * innerHeight}px)`;
-        else if (e.type === 'PINCH_START') setCls('pinch');
-        else if (e.type === 'DRAG_START') setCls('drag');
-        else if (e.type === 'PINCH_END') setCls('');
-        else if (e.type === 'CLICK') {
-          c.classList.remove('clicked');
-          void c.offsetWidth;
-          c.classList.add('clicked');
-        } else if (e.type === 'MODE') setCls(e.mode === 'scroll' ? 'scroll' : e.mode === 'zoom' ? 'zoom' : e.mode === 'drag' ? 'drag' : '');
-      }),
-    [],
-  );
+  const holdMs = visionStatus.use(s => s.settings.clickMaxMs);
+  useEffect(() => {
+    let n = 0;
+    let t = 0;
+    const say = (text: string) => {
+      clearTimeout(t);
+      setChip({ text, n: ++n });
+      t = window.setTimeout(() => setChip(null), 900);
+    };
+    const off = vision.on(e => {
+      const c = el.current;
+      if (!c) return;
+      if (e.type === 'POINTER_MOVE') c.style.transform = `translate(${e.x * innerWidth}px, ${e.y * innerHeight}px)`;
+      else if (e.type === 'PINCH_START') setCls('pinch holding');
+      else if (e.type === 'DRAG_START') setCls('drag');
+      else if (e.type === 'PINCH_END') setCls('');
+      else if (e.type === 'CLICK') {
+        c.classList.remove('clicked');
+        void c.offsetWidth;
+        c.classList.add('clicked');
+      } else if (e.type === 'MODE') {
+        setCls(e.mode === 'scroll' ? 'scroll' : e.mode === 'zoom' ? 'zoom' : e.mode === 'drag' ? 'drag' : '');
+        if (e.mode === 'scroll') say('Scroll');
+        if (e.mode === 'zoom') say('Zoom');
+      }
+      if (e.type === 'SWIPE') say(e.dir === 'left' ? 'Next ›' : e.dir === 'right' ? '‹ Back' : e.dir === 'up' ? 'Swipe up' : 'Swipe down');
+      const label = CONFIRM[e.type];
+      if (label) say(label);
+    });
+    return () => {
+      off();
+      clearTimeout(t);
+    };
+  }, []);
   return (
-    <div ref={el} className={`hand-cursor ${cls} ${state === 'ACTIVE' ? 'on' : ''}`} data-vision-ignore>
+    <div ref={el} className={`hand-cursor ${cls} ${state === 'ACTIVE' ? 'on' : ''}`} style={{ ['--hold' as string]: `${holdMs}ms` }} data-vision-ignore>
       <span className="hc-ring" />
+      <svg className="hc-hold" width="56" height="56" viewBox="0 0 56 56" aria-hidden>
+        <circle cx="28" cy="28" r="24" />
+      </svg>
       <span className="hc-dot" />
+      {chip && (
+        <span key={chip.n} className="hc-chip" role="status">
+          {chip.text}
+        </span>
+      )}
     </div>
   );
 }
